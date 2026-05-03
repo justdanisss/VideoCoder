@@ -428,10 +428,10 @@ def compress_video(input_path, output_path, v_map, a_maps, s_maps, encoder, enco
                         )
                 print()
 
-            t = threading.Thread(target=_tee_progress, daemon=True)
-            t.start()
+            progress_thread = threading.Thread(target=_tee_progress, daemon=True)
+            progress_thread.start()
             proc.wait()
-            t.join()
+            progress_thread.join()
 
             if proc.returncode == 0:
                 return True
@@ -715,28 +715,32 @@ def summarize_subtitle_plan(subtitle_tracks):
 
 def choose_auto_scale(video_stream, format_info, crf):
     height = _safe_int(video_stream.get('height'))
+    width = _safe_int(video_stream.get('width'))
     bitrate = _safe_int(video_stream.get('bit_rate')) or _safe_int(format_info.get('bit_rate'))
     bitrate_kbps = bitrate / 1000 if bitrate else 0
     duration = max(float(format_info.get('duration', 0) or 0), 1.0)
     size_mb = _safe_int(format_info.get('size')) / (1024 * 1024)
     size_per_min_mb = size_mb / max(duration / 60.0, 1.0)
+    is_hd_plus = height >= 900 or width >= 1600
 
     if height >= 2160:
         return 1080, t('scale_auto_4k_1080')
-    if height >= 1080 and (bitrate_kbps >= 4500 or size_per_min_mb >= 18 or crf >= 26):
+    if is_hd_plus and (bitrate_kbps >= 4500 or size_per_min_mb >= 18 or crf >= 26):
         return 720, t('scale_auto_1080_720')
-    if height >= 720 and (bitrate_kbps >= 4200 or size_per_min_mb >= 22) and crf >= 28:
+    if 720 <= height < 900 and (bitrate_kbps >= 5000 or size_per_min_mb >= 28) and crf >= 28:
         return 480, t('scale_auto_720_480')
     return 0, t('scale_keep_original')
 
 
 def choose_target_scale(video_stream, target_size_mb, target_total_kbps):
     height = _safe_int(video_stream.get('height'))
+    width = _safe_int(video_stream.get('width'))
+    is_hd_plus = height >= 900 or width >= 1600
     if height >= 2160:
         return 1080, t('scale_target_4k_1080')
-    if height >= 1080 and (target_size_mb <= 180 or target_total_kbps <= 2200):
+    if is_hd_plus and (target_size_mb <= 180 or target_total_kbps <= 2200):
         return 720, t('scale_target_1080_720')
-    if height >= 720 and (target_size_mb <= 55 or target_total_kbps <= 700):
+    if 720 <= height < 900 and (target_size_mb <= 55 or target_total_kbps <= 700):
         return 480, t('scale_target_720_480')
     return 0, t('scale_keep_original')
 
@@ -843,7 +847,9 @@ def _extract_episode_code(name):
 
 def build_clean_title(full_path):
     stem = Path(full_path).stem
-    name = re.sub(r'[\._]+', ' ', stem)
+    raw_name = stem
+    raw_name = re.sub(r'(?i)\[[^\]]*?\]\((?:www\.)?[a-z0-9.-]+\.[a-z]{2,}\)', ' ', raw_name)
+    name = re.sub(r'[\._]+', ' ', raw_name)
     name = re.sub(r'(?i)\b(www\.)?[a-z0-9-]+\.(com|net|org|info|biz|cc|to|me|tv|mx|io)\b', ' ', name)
     episode_code = _extract_episode_code(name)
     year_match = re.search(r'\b(19\d{2}|20\d{2})\b', name)
@@ -861,6 +867,7 @@ def build_clean_title(full_path):
         r')\b'
     )
     name = noise_pattern.sub(' ', name)
+    name = re.sub(r'(?i)\[(?:esp|spa|cast|lat|sub|eng|vose|vos|dual|multi)\]', ' ', name)
 
     if episode_code:
         name = re.sub(r'(?i)\bS\d{1,2}E\d{1,3}\b', ' ', name)
@@ -870,6 +877,8 @@ def build_clean_title(full_path):
     if year:
         name = re.sub(rf'\b{re.escape(year)}\b', ' ', name)
 
+    name = re.sub(r'\(\s*\)', ' ', name)
+    name = re.sub(r'\[\s*\]', ' ', name)
     name = re.sub(r'[-]+', ' ', name)
     name = re.sub(r'\s+', ' ', name).strip(" .-_")
 
