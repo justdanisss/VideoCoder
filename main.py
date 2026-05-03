@@ -62,6 +62,10 @@ STRINGS = {
         'es': "\nBorrar original si el compressed sale mejor? [s/N]: ",
         'en': "\nDelete original if compressed output is better? [y/N]: ",
     },
+    'smart_rename_q': {
+        'es': "Renombrar archivos con limpieza inteligente? [s/N]: ",
+        'en': "Smart rename output files? [y/N]: ",
+    },
     'simulation_active': {
         'es': "Modo simulacion activo: se analizara todo pero no se comprimira nada.",
         'en': "Simulation mode active: everything will be analyzed but nothing will be compressed.",
@@ -98,6 +102,8 @@ STRINGS = {
     'total_saved': {'es': "Total ahorrado: {size}", 'en': "Total saved: {size}"},
     'process_finished': {'es': "Proceso terminado.", 'en': "Process finished."},
     'target_size_label': {'es': "Tamano objetivo", 'en': "Target Size"},
+    'smart_rename_preview': {'es': "Renombrado inteligente: {name}", 'en': "Smart rename: {name}"},
+    'final_renamed': {'es': "Renombrado final: {path}", 'en': "Final rename: {path}"},
 }
 
 
@@ -637,11 +643,11 @@ def choose_auto_crf(video_stream, format_info):
         return None, f"su bitrate ({bitrate_kbps:.0f} kbps) ya es demasiado bajo para recomprimir con seguridad"
 
     if is_hevc:
-        crf = 25
+        crf = 22
     elif is_h264:
-        crf = 24
+        crf = 21
     else:
-        crf = 24
+        crf = 21
 
     if height >= 2160:
         crf += 1
@@ -664,7 +670,7 @@ def choose_auto_crf(video_stream, format_info):
     elif size_per_min_mb <= 6:
         crf -= 1
 
-    crf = max(20, min(28, crf))
+    crf = max(19, min(23, crf))
     reason = (
         f"{codec or 'codec desconocido'}, {height or '?'}p, {bitrate_kbps:.0f} kbps, "
         f"{size_per_min_mb:.1f} MB/min"
@@ -678,16 +684,83 @@ def human_size(n):
         n /= 1024
     return f"{n:.1f} TB"
 
-def safe_output_path(full_path):
-    stem   = Path(full_path).stem
+
+def _sanitize_filename_part(name):
+    name = re.sub(r'[\\/:*?"<>|]+', ' ', name)
+    name = re.sub(r'\s+', ' ', name).strip(" .-_")
+    return name or "video"
+
+
+def _extract_episode_code(name):
+    patterns = [
+        re.compile(r'(?i)\bS(\d{1,2})E(\d{1,3})\b'),
+        re.compile(r'(?i)\b(\d{1,2})x(\d{1,3})\b'),
+        re.compile(r'(?i)\bE(?:P)?(\d{1,3})\b'),
+    ]
+    for pattern in patterns:
+        match = pattern.search(name)
+        if not match:
+            continue
+        if len(match.groups()) == 2:
+            return f"S{int(match.group(1)):02d}E{int(match.group(2)):02d}"
+        return f"E{int(match.group(1)):02d}"
+    return None
+
+
+def build_clean_title(full_path):
+    stem = Path(full_path).stem
+    name = re.sub(r'[\._]+', ' ', stem)
+    name = re.sub(r'(?i)\b(www\.)?[a-z0-9-]+\.(com|net|org|info|biz|cc|to|me|tv|mx|io)\b', ' ', name)
+    episode_code = _extract_episode_code(name)
+    year_match = re.search(r'\b(19\d{2}|20\d{2})\b', name)
+    year = year_match.group(1) if year_match else None
+
+    name = re.sub(r'[\[\(\{](?:[^\]\)\}]*?(?:2160p|1080p|720p|480p|x264|x265|h\.?264|h\.?265|hevc|bluray|brrip|bdrip|web[- ]?dl|webrip|hdrip|dvdrip|torrent|subs?|dub)[^\]\)\}]*)[\]\)\}]', ' ', name, flags=re.I)
+    noise_pattern = re.compile(
+        r'(?i)\b('
+        r'2160p|1080p|720p|480p|x264|x265|h\.?264|h\.?265|hevc|av1|10bit|8bit|hdr|sdr|'
+        r'bluray|brrip|bdrip|web[- ]?dl|webrip|hdrip|dvdrip|remux|proper|repack|'
+        r'aac2?\.?0?|ac3|eac3|dts(?:-hd)?|truehd|atmos|mp3|flac|opus|'
+        r'yify|rarbg|ettv|eztv|torrentgalaxy|tgx|psa|qxr|vyndros|'
+        r'readnfo|internal|extended|uncut|limited|multi|subs?|dub|'
+        r'mkv|mp4|avi|sample'
+        r')\b'
+    )
+    name = noise_pattern.sub(' ', name)
+
+    if episode_code:
+        name = re.sub(r'(?i)\bS\d{1,2}E\d{1,3}\b', ' ', name)
+        name = re.sub(r'(?i)\b\d{1,2}x\d{1,3}\b', ' ', name)
+        name = re.sub(r'(?i)\bE(?:P)?\d{1,3}\b', ' ', name)
+
+    if year:
+        name = re.sub(rf'\b{re.escape(year)}\b', ' ', name)
+
+    name = re.sub(r'[-]+', ' ', name)
+    name = re.sub(r'\s+', ' ', name).strip(" .-_")
+
+    if episode_code:
+        clean = f"{name} {episode_code}".strip()
+    elif year:
+        clean = f"{name} ({year})".strip() if name else year
+    else:
+        clean = name
+    return _sanitize_filename_part(clean or stem)
+
+
+def build_output_path(full_path, output_stem):
     suffix = Path(full_path).suffix
-    base   = os.path.dirname(full_path)
-    path   = os.path.join(base, f"{stem}_compressed{suffix}")
+    base = os.path.dirname(full_path)
+    path = os.path.join(base, f"{output_stem}{suffix}")
     n = 2
     while os.path.exists(path):
-        path = os.path.join(base, f"{stem}_compressed_{n}{suffix}")
+        path = os.path.join(base, f"{output_stem}_{n}{suffix}")
         n += 1
     return path
+
+
+def safe_output_path(full_path):
+    return build_output_path(full_path, f"{Path(full_path).stem}_compressed")
 
 
 def summarize_video_plan(video_stream, format_info, crf):
@@ -758,6 +831,7 @@ def main():
         print(f"\n{R}{t('invalid_path')}{RST}")
         return
     delete_original_if_better = ask_yes_no('delete_originals_q', default=False)
+    smart_rename_enabled = ask_yes_no('smart_rename_q', default=False)
 
     videos = [
         os.path.join(root, f)
@@ -794,6 +868,9 @@ def main():
         file = os.path.basename(full_path)
         print(f"\n{BOLD}{'─'*52}")
         print(f"  📁  {file}{RST}")
+        clean_title = build_clean_title(full_path) if smart_rename_enabled else None
+        if clean_title:
+            print(f"  {DIM}{t('smart_rename_preview', name=clean_title)}{RST}")
 
         try:
             info = get_video_info(full_path)
@@ -894,7 +971,8 @@ def main():
             print(f"  {C}{t('target_size_label')}:{RST} {target_size_mb:.1f} MB")
             print(f"  {DIM}{reason}.{RST}")
 
-        out_path  = safe_output_path(full_path)
+        output_stem = f"{clean_title}_compressed" if clean_title else f"{Path(full_path).stem}_compressed"
+        out_path  = build_output_path(full_path, output_stem)
         orig_size = os.path.getsize(full_path)
         print(f"\n  {DIM}{t('original_size', size=human_size(orig_size))}{RST}")
 
@@ -924,7 +1002,14 @@ def main():
             print(f"  {color}{t('saved_ok', size=human_size(new_size), pct=pct, saved=human_size(abs(saved)))}{RST}")
             print(f"  {DIM}{t('saved_path', path=out_path)}{RST}")
             if delete_original_if_better and os.path.exists(full_path):
+                final_path = out_path
                 os.remove(full_path)
+                if clean_title:
+                    desired_path = build_output_path(full_path, clean_title)
+                    if os.path.abspath(desired_path) != os.path.abspath(out_path):
+                        os.replace(out_path, desired_path)
+                        final_path = desired_path
+                        print(f"  {DIM}{t('final_renamed', path=final_path)}{RST}")
                 print(f"  {Y}{t('deleted_original')}{RST}")
         else:
             print(f"  {R}{t('ffmpeg_error_file', file=file)}{RST}")
