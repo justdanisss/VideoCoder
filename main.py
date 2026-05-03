@@ -643,11 +643,11 @@ def choose_auto_crf(video_stream, format_info):
         return None, f"su bitrate ({bitrate_kbps:.0f} kbps) ya es demasiado bajo para recomprimir con seguridad"
 
     if is_hevc:
-        crf = 22
+        crf = 24
     elif is_h264:
-        crf = 21
+        crf = 24
     else:
-        crf = 21
+        crf = 24
 
     if height >= 2160:
         crf += 1
@@ -670,7 +670,7 @@ def choose_auto_crf(video_stream, format_info):
     elif size_per_min_mb <= 6:
         crf -= 1
 
-    crf = max(19, min(23, crf))
+    crf = max(24, min(28, crf))
     reason = (
         f"{codec or 'codec desconocido'}, {height or '?'}p, {bitrate_kbps:.0f} kbps, "
         f"{size_per_min_mb:.1f} MB/min"
