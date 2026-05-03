@@ -148,6 +148,7 @@ STRINGS = {
     'forced_suffix': {'es': " forzados", 'en': " forced"},
     'copy_mode': {'es': "copiar", 'en': "copy"},
     'reencode_mode': {'es': "recodificar", 'en': "reencode"},
+    'audio_unknown_channels': {'es': "canales ?", 'en': "channels ?"},
     'keep_original_resolution': {'es': "original", 'en': "original"},
     'unknown_resolution': {'es': "resolucion desconocida", 'en': "unknown resolution"},
     'unknown_codec': {'es': "codec desconocido", 'en': "unknown codec"},
@@ -269,7 +270,6 @@ def _pick_audio_codec():
 
 def _build_ffmpeg_cmd(input_path, output_path, v_map, audio_tracks, subtitle_tracks, encoder, encode_plan):
     audio_codec = _pick_audio_codec()
-    audio_bitrate = '96k' if audio_codec == 'libopus' else '128k'
     ext = Path(output_path).suffix.lower()
     # MP4 solo admite mov_text; MKV admite casi todo
     sub_codec = 'mov_text' if ext == '.mp4' else 'copy'
@@ -311,7 +311,9 @@ def _build_ffmpeg_cmd(input_path, output_path, v_map, audio_tracks, subtitle_tra
     if audio_tracks and all(track.get('copy_ok') for track in audio_tracks):
         cmd += ['-c:a', 'copy']
     else:
-        cmd += ['-c:a', audio_codec, '-b:a', audio_bitrate]
+        cmd += ['-c:a', audio_codec]
+        for i, track in enumerate(audio_tracks):
+            cmd += [f'-b:a:{i}', choose_audio_bitrate(track)]
 
     if subtitle_tracks:
         cmd += ['-c:s', sub_codec]
@@ -350,7 +352,7 @@ def get_video_info(file_path):
     cmd = [
         'ffprobe', '-v', 'quiet', '-print_format', 'json',
         '-show_streams', '-show_entries',
-        'stream=index,codec_type,codec_name,width,height,bit_rate,disposition:stream_tags=language,title',
+        'stream=index,codec_type,codec_name,width,height,bit_rate,channels,channel_layout,disposition:stream_tags=language,title',
         '-show_entries', 'format=duration,size,bit_rate', file_path
     ]
     try:
@@ -654,9 +656,25 @@ def _pick_default_track(tracks, selected_indexes):
 def should_copy_audio(track):
     codec = (track.get('codec') or '').lower()
     bitrate = _safe_int(track.get('bit_rate'))
-    if codec in ('aac', 'opus', 'libopus', 'ac3', 'eac3') and bitrate <= 768000:
-        return True
-    return False
+    channels = _safe_int(track.get('channels'))
+    if codec not in ('aac', 'opus', 'libopus'):
+        return False
+    if channels >= 6:
+        return bitrate > 0 and bitrate <= 192000
+    if channels >= 2:
+        return bitrate > 0 and bitrate <= 160000
+    return bitrate > 0 and bitrate <= 128000
+
+
+def choose_audio_bitrate(track):
+    channels = _safe_int(track.get('channels'))
+    if channels >= 8:
+        return '192k'
+    if channels >= 6:
+        return '144k'
+    if channels >= 2:
+        return '96k'
+    return '64k'
 
 
 def estimate_audio_bitrate_kbps(audio_tracks):
@@ -666,7 +684,7 @@ def estimate_audio_bitrate_kbps(audio_tracks):
             bitrate = _safe_int(track.get('bit_rate')) // 1000
             total += bitrate if bitrate > 0 else 128
         else:
-            total += 96 if _pick_audio_codec() == 'libopus' else 128
+            total += int(choose_audio_bitrate(track).rstrip('k'))
     return total
 
 
@@ -676,7 +694,10 @@ def summarize_audio_plan(audio_tracks):
     parts = []
     for track in audio_tracks:
         mode = t('copy_mode') if track.get('copy_ok') else t('reencode_mode')
-        parts.append(f"#{track['index']} {track['codec']} {track['lang']} [{mode}]")
+        channels = _safe_int(track.get('channels'))
+        channel_label = f"{channels}ch" if channels > 0 else t('audio_unknown_channels')
+        target = '' if track.get('copy_ok') else f" -> {choose_audio_bitrate(track)}"
+        parts.append(f"#{track['index']} {track['codec']} {track['lang']} {channel_label} [{mode}{target}]")
     return ', '.join(parts)
 
 
@@ -1018,6 +1039,8 @@ def main():
                     'extra': extra,
                     'codec': codec,
                     'bit_rate': s.get('bit_rate'),
+                    'channels': s.get('channels'),
+                    'channel_layout': s.get('channel_layout'),
                     'default': default,
                 })
             elif s['codec_type'] == 'subtitle':
