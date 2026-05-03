@@ -220,6 +220,8 @@ def _build_ffmpeg_cmd(input_path, output_path, v_map, audio_tracks, subtitle_tra
     for track in subtitle_tracks:
         cmd += ['-map', f"0:{track['index']}"]
     cmd += ['-map_metadata', '0']
+    if encode_plan.get('scale_height'):
+        cmd += ['-vf', f"scale=-2:{encode_plan['scale_height']}"]
 
     if encode_plan['kind'] == 'target_size':
         video_bitrate_k = str(encode_plan['video_bitrate_k'])
@@ -552,6 +554,27 @@ def ask_target_size_mb(default=120):
             print(f"  {R}{msg}{RST}")
 
 
+def ask_resolution_target(source_height):
+    options = [('0', 'Original', 0)]
+    if source_height >= 2160:
+        options.append(('1', '1080p', 1080))
+    if source_height >= 1080:
+        options.append(('2', '720p', 720))
+    if source_height >= 720:
+        options.append(('3', '480p', 480))
+
+    print(f"\n  {BOLD}{'Resolucion de salida' if UI_LANG == 'es' else 'Output resolution'}{RST}")
+    for key, label, _ in options:
+        print(f"   {C}[{key}]{RST} {label}")
+
+    valid = {key: value for key, _, value in options}
+    while True:
+        raw = input(f"  -> {'Elige opcion' if UI_LANG == 'es' else 'Choose option'}: ").strip()
+        if raw in valid:
+            return valid[raw]
+        print(f"  {R}{t('invalid_1_2')}{RST}")
+
+
 def _safe_int(value, default=0):
     try:
         if value in (None, '', 'N/A'):
@@ -609,6 +632,40 @@ def summarize_subtitle_plan(subtitle_tracks):
             label += " forced"
         parts.append(label)
     return ', '.join(parts)
+
+
+def choose_auto_scale(video_stream, format_info, crf):
+    height = _safe_int(video_stream.get('height'))
+    bitrate = _safe_int(video_stream.get('bit_rate')) or _safe_int(format_info.get('bit_rate'))
+    bitrate_kbps = bitrate / 1000 if bitrate else 0
+    duration = max(float(format_info.get('duration', 0) or 0), 1.0)
+    size_mb = _safe_int(format_info.get('size')) / (1024 * 1024)
+    size_per_min_mb = size_mb / max(duration / 60.0, 1.0)
+
+    if height >= 2160:
+        return 1080, "4K source detected, downscaling to 1080p for major savings"
+    if height >= 1080 and (bitrate_kbps >= 4500 or size_per_min_mb >= 18 or crf >= 26):
+        return 720, "inflated 1080p source detected, downscaling to 720p"
+    if height >= 720 and (bitrate_kbps >= 4200 or size_per_min_mb >= 22) and crf >= 28:
+        return 480, "inflated 720p source detected, downscaling to 480p"
+    return 0, "keeping original resolution"
+
+
+def choose_target_scale(video_stream, target_size_mb, target_total_kbps):
+    height = _safe_int(video_stream.get('height'))
+    if height >= 2160:
+        return 1080, "4K source adjusted to 1080p for target size"
+    if height >= 1080 and (target_size_mb <= 180 or target_total_kbps <= 2200):
+        return 720, "1080p source adjusted to 720p for target size"
+    if height >= 720 and (target_size_mb <= 55 or target_total_kbps <= 700):
+        return 480, "720p source adjusted to 480p for target size"
+    return 0, "keeping original resolution"
+
+
+def summarize_scale(scale_height):
+    if not scale_height:
+        return "original"
+    return f"{scale_height}p"
 
 
 def choose_auto_crf(video_stream, format_info):
@@ -790,6 +847,7 @@ def build_target_size_plan(format_info, audio_tracks, subtitle_tracks, target_si
         'target_size_mb': target_size_mb,
         'video_bitrate_k': video_kbps,
         'total_bitrate_k': target_total_kbps,
+        'scale_height': 0,
     }
     reason = f"objetivo {target_size_mb:.1f} MB, video ~{video_kbps} kbps, audio ~{audio_kbps} kbps"
     return plan, reason
@@ -930,15 +988,18 @@ def main():
             print(f"  {Y}Sin audio -> se conserva el primero.{RST}")
             selected_a = [audios[0]['index']] if audios else []
 
-        encode_plan = {'kind': 'crf', 'crf': crf}
+        source_height = _safe_int(video_stream.get('height'))
+        encode_plan = {'kind': 'crf', 'crf': crf, 'scale_height': 0}
         if modo == '1':
             current_crf, reason = choose_auto_crf(video_stream, format_info)
             if current_crf is None:
                 print(f"  {Y}Saltando recompresion: {reason}.{RST}")
                 continue
-            encode_plan = {'kind': 'crf', 'crf': current_crf}
+            auto_scale, scale_reason = choose_auto_scale(video_stream, format_info, current_crf)
+            encode_plan = {'kind': 'crf', 'crf': current_crf, 'scale_height': auto_scale}
             print(f"  {C}{t('automatic_decision')}{RST} {summarize_video_plan(video_stream, format_info, current_crf)}")
             print(f"  {DIM}{t('reason', reason=reason)}{RST}")
+            print(f"  {DIM}Resolution: {summarize_scale(auto_scale)} ({scale_reason}){RST}")
 
         selected_audio_tracks = []
         audio_by_index = {track['index']: track for track in audios}
@@ -968,8 +1029,16 @@ def main():
             if encode_plan is None:
                 print(f"  {Y}Saltando recompresion: {reason}.{RST}")
                 continue
+            target_scale, scale_reason = choose_target_scale(
+                video_stream, target_size_mb, encode_plan['total_bitrate_k']
+            )
+            encode_plan['scale_height'] = target_scale
             print(f"  {C}{t('target_size_label')}:{RST} {target_size_mb:.1f} MB")
             print(f"  {DIM}{reason}.{RST}")
+            print(f"  {DIM}Resolution: {summarize_scale(target_scale)} ({scale_reason}){RST}")
+        elif modo == '3':
+            manual_scale = ask_resolution_target(source_height)
+            encode_plan['scale_height'] = manual_scale
 
         output_stem = f"{clean_title}_compressed" if clean_title else f"{Path(full_path).stem}_compressed"
         out_path  = build_output_path(full_path, output_stem)
