@@ -46,7 +46,7 @@ STRINGS = {
         'en': "\nLanguage / Idioma:\n   [1] English\n   [2] Espanol",
     },
     'choose_ui_lang_prompt': {'es': "  -> Choose language [1/2]: ", 'en': "  -> Choose language [1/2]: "},
-    'invalid_1_2': {'es': "  Elige 1 o 2.", 'en': "  Choose 1 or 2."},
+    'invalid_1_2': {'es': "  Elige una opcion valida.", 'en': "  Choose a valid option."},
     'cancelled_temp_deleted': {'es': "Cancelado. Archivo temporal eliminado.", 'en': "Cancelled. Temporary file removed."},
     'checking_dependencies': {'es': "Verificando dependencias...", 'en': "Checking dependencies..."},
     'python_required': {'es': "Python 3.10+ requerido (tienes {version})", 'en': "Python 3.10+ required (you have {version})"},
@@ -74,7 +74,8 @@ STRINGS = {
     'selection_mode': {'es': "Modo de seleccion:", 'en': "Selection mode:"},
     'mode_manual': {'es': "Manual      - eliges audio y subs en cada archivo", 'en': "Manual      - choose audio and subtitles for each file"},
     'mode_auto': {'es': "Automatico  - eliges idiomas y el script decide solo", 'en': "Automatic   - choose languages and the script decides"},
-    'choose_mode': {'es': "  -> Modo [1/2]: ", 'en': "  -> Mode [1/2]: "},
+    'mode_target': {'es': "Tamano objetivo - MB por archivo", 'en': "Target Size - goal MB per file"},
+    'choose_mode': {'es': "  -> Modo [1/2/3]: ", 'en': "  -> Mode [1/2/3]: "},
     'available_languages': {'es': "Idiomas disponibles:", 'en': "Available languages:"},
     'choose_keep_langs': {'es': "  -> Idiomas a conservar: ", 'en': "  -> Languages to keep: "},
     'keeping_langs': {'es': "Conservando: {names}", 'en': "Keeping: {names}"},
@@ -96,6 +97,7 @@ STRINGS = {
     'ffmpeg_error_file': {'es': "✘  FFmpeg termino con error en '{file}'.", 'en': "✘  FFmpeg ended with an error for '{file}'."},
     'total_saved': {'es': "Total ahorrado: {size}", 'en': "Total saved: {size}"},
     'process_finished': {'es': "Proceso terminado.", 'en': "Process finished."},
+    'target_size_label': {'es': "Tamano objetivo", 'en': "Target Size"},
 }
 
 
@@ -198,7 +200,7 @@ def _pick_audio_codec():
     return 'libopus' if _ffmpeg_has_codec('libopus') else 'aac'
 
 
-def _build_ffmpeg_cmd(input_path, output_path, v_map, audio_tracks, subtitle_tracks, encoder, crf):
+def _build_ffmpeg_cmd(input_path, output_path, v_map, audio_tracks, subtitle_tracks, encoder, encode_plan):
     audio_codec = _pick_audio_codec()
     audio_bitrate = '96k' if audio_codec == 'libopus' else '128k'
     ext = Path(output_path).suffix.lower()
@@ -213,14 +215,29 @@ def _build_ffmpeg_cmd(input_path, output_path, v_map, audio_tracks, subtitle_tra
         cmd += ['-map', f"0:{track['index']}"]
     cmd += ['-map_metadata', '0']
 
-    if encoder == 'hevc_nvenc':
-        cmd += ['-c:v', 'hevc_nvenc', '-rc', 'vbr', '-cq', str(crf), '-preset', 'p4']
+    if encode_plan['kind'] == 'target_size':
+        video_bitrate_k = str(encode_plan['video_bitrate_k'])
+        maxrate_k = str(int(encode_plan['video_bitrate_k'] * 1.35))
+        bufsize_k = str(int(encode_plan['video_bitrate_k'] * 2))
+        if encoder == 'hevc_nvenc':
+            cmd += ['-c:v', 'hevc_nvenc', '-rc', 'vbr', '-b:v', f'{video_bitrate_k}k',
+                    '-maxrate', f'{maxrate_k}k', '-bufsize', f'{bufsize_k}k', '-preset', 'p4']
+        elif encoder == 'hevc_amf':
+            cmd += ['-c:v', 'hevc_amf', '-rc', 'vbr_peak', '-b:v', f'{video_bitrate_k}k',
+                    '-maxrate', f'{maxrate_k}k', '-quality', 'balanced']
+        elif encoder == 'hevc_videotoolbox':
+            cmd += ['-c:v', 'hevc_videotoolbox', '-b:v', f'{video_bitrate_k}k']
+        else:
+            cmd += ['-c:v', 'libx265', '-b:v', f'{video_bitrate_k}k', '-maxrate', f'{maxrate_k}k',
+                    '-bufsize', f'{bufsize_k}k', '-preset', 'medium']
+    elif encoder == 'hevc_nvenc':
+        cmd += ['-c:v', 'hevc_nvenc', '-rc', 'vbr', '-cq', str(encode_plan['crf']), '-preset', 'p4']
     elif encoder == 'hevc_amf':
-        cmd += ['-c:v', 'hevc_amf', '-quality', 'balanced', '-rc', 'cqp', '-qp_i', str(crf)]
+        cmd += ['-c:v', 'hevc_amf', '-quality', 'balanced', '-rc', 'cqp', '-qp_i', str(encode_plan['crf'])]
     elif encoder == 'hevc_videotoolbox':
         cmd += ['-c:v', 'hevc_videotoolbox', '-b:v', '2000k']
     else:
-        cmd += ['-c:v', 'libx265', '-crf', str(crf), '-preset', 'medium']
+        cmd += ['-c:v', 'libx265', '-crf', str(encode_plan['crf']), '-preset', 'medium']
 
     if audio_tracks and all(track.get('copy_ok') for track in audio_tracks):
         cmd += ['-c:a', 'copy']
@@ -304,7 +321,7 @@ def _progress_reader(proc, duration):
 
 
 # ── Compresion ────────────────────────────────
-def compress_video(input_path, output_path, v_map, a_maps, s_maps, encoder, crf, duration):
+def compress_video(input_path, output_path, v_map, a_maps, s_maps, encoder, encode_plan, duration):
     global _current_output
     _current_output = output_path
 
@@ -313,7 +330,7 @@ def compress_video(input_path, output_path, v_map, a_maps, s_maps, encoder, crf,
     try:
         for attempt in range(2):
             cmd = _build_ffmpeg_cmd(
-                input_path, output_path, v_map, a_maps, s_maps, selected_encoder, crf
+                input_path, output_path, v_map, a_maps, s_maps, selected_encoder, encode_plan
             )
             print(f"\n{DIM}CMD: {' '.join(cmd)}{RST}")
 
@@ -512,6 +529,23 @@ def ask_crf(default=24):
             print(f"  {R}Numero entero.{RST}")
 
 
+def ask_target_size_mb(default=120):
+    while True:
+        label = "Tamano objetivo por archivo en MB" if UI_LANG == 'es' else "Target size per file in MB"
+        raw = input(f"\n  {BOLD}{label}{RST} [{default}]: ").strip()
+        if raw == '':
+            return default
+        try:
+            value = float(raw.replace(',', '.'))
+            if value >= 20:
+                return value
+            msg = "Pon al menos 20 MB para que tenga sentido." if UI_LANG == 'es' else "Use at least 20 MB so it makes sense."
+            print(f"  {R}{msg}{RST}")
+        except ValueError:
+            msg = "Numero valido, por favor." if UI_LANG == 'es' else "Please enter a valid number."
+            print(f"  {R}{msg}{RST}")
+
+
 def _safe_int(value, default=0):
     try:
         if value in (None, '', 'N/A'):
@@ -536,6 +570,17 @@ def should_copy_audio(track):
     if codec in ('aac', 'opus', 'libopus', 'ac3', 'eac3') and bitrate <= 768000:
         return True
     return False
+
+
+def estimate_audio_bitrate_kbps(audio_tracks):
+    total = 0
+    for track in audio_tracks:
+        if track.get('copy_ok'):
+            bitrate = _safe_int(track.get('bit_rate')) // 1000
+            total += bitrate if bitrate > 0 else 128
+        else:
+            total += 96 if _pick_audio_codec() == 'libopus' else 128
+    return total
 
 
 def summarize_audio_plan(audio_tracks):
@@ -655,6 +700,28 @@ def summarize_video_plan(video_stream, format_info, crf):
     return f"{codec}, {resolution}, {bitrate_kbps:.0f} kbps -> CRF {crf}"
 
 
+def build_target_size_plan(format_info, audio_tracks, subtitle_tracks, target_size_mb):
+    duration = max(float(format_info.get('duration', 0) or 0), 1.0)
+    original_size_mb = _safe_int(format_info.get('size')) / (1024 * 1024)
+    if original_size_mb and original_size_mb <= target_size_mb:
+        return None, f"el archivo ya pesa {original_size_mb:.1f} MB, por debajo del objetivo"
+
+    target_total_kbps = max(300, int((target_size_mb * 8192) / duration))
+    audio_kbps = estimate_audio_bitrate_kbps(audio_tracks)
+    subtitle_overhead_kbps = 16 if subtitle_tracks else 0
+    video_kbps = target_total_kbps - audio_kbps - subtitle_overhead_kbps - 24
+    video_kbps = max(250, video_kbps)
+
+    plan = {
+        'kind': 'target_size',
+        'target_size_mb': target_size_mb,
+        'video_bitrate_k': video_kbps,
+        'total_bitrate_k': target_total_kbps,
+    }
+    reason = f"objetivo {target_size_mb:.1f} MB, video ~{video_kbps} kbps, audio ~{audio_kbps} kbps"
+    return plan, reason
+
+
 # ── Main ──────────────────────────────────────
 def main():
     simulation_mode = '-S' in sys.argv[1:] or '--simulate' in sys.argv[1:]
@@ -707,18 +774,20 @@ def main():
     # ── Elegir modo ──
     print(f"\n  {BOLD}{t('selection_mode')}{RST}")
     print(f"   {C}[1]{RST} {t('mode_auto')}")
-    print(f"   {C}[2]{RST} {t('mode_manual')}")
+    print(f"   {C}[2]{RST} {t('mode_target')}")
+    print(f"   {C}[3]{RST} {t('mode_manual')}")
     while True:
         modo = input(t('choose_mode')).strip()
-        if modo in ('1', '2'):
+        if modo in ('1', '2', '3'):
             break
         print(f"  {R}{t('invalid_1_2')}{RST}")
 
     target_langs = None
-    if modo == '1':
+    if modo in ('1', '2'):
         target_langs = choose_target_langs()
 
-    crf = ask_crf() if modo == '2' else None
+    crf = ask_crf() if modo == '3' else None
+    target_size_mb = ask_target_size_mb() if modo == '2' else None
     total_saved = 0
 
     for full_path in videos:
@@ -774,7 +843,7 @@ def main():
             print(f"  {R}Sin pista de video. Saltando.{RST}")
             continue
 
-        if modo == '1' and target_langs:
+        if modo in ('1', '2') and target_langs:
             selected_a, selected_s = auto_select_tracks(audios, subs, target_langs, file)
         else:
             selected_a = pick_tracks("Pistas de audio:", audios)
@@ -784,12 +853,13 @@ def main():
             print(f"  {Y}Sin audio -> se conserva el primero.{RST}")
             selected_a = [audios[0]['index']] if audios else []
 
-        current_crf = crf
+        encode_plan = {'kind': 'crf', 'crf': crf}
         if modo == '1':
             current_crf, reason = choose_auto_crf(video_stream, format_info)
             if current_crf is None:
                 print(f"  {Y}Saltando recompresion: {reason}.{RST}")
                 continue
+            encode_plan = {'kind': 'crf', 'crf': current_crf}
             print(f"  {C}{t('automatic_decision')}{RST} {summarize_video_plan(video_stream, format_info, current_crf)}")
             print(f"  {DIM}{t('reason', reason=reason)}{RST}")
 
@@ -814,6 +884,16 @@ def main():
         print(f"  {C}{t('audio')}:{RST} {summarize_audio_plan(selected_audio_tracks)}")
         print(f"  {C}{t('subs')}:{RST} {summarize_subtitle_plan(selected_subtitle_tracks)}")
 
+        if modo == '2':
+            encode_plan, reason = build_target_size_plan(
+                format_info, selected_audio_tracks, selected_subtitle_tracks, target_size_mb
+            )
+            if encode_plan is None:
+                print(f"  {Y}Saltando recompresion: {reason}.{RST}")
+                continue
+            print(f"  {C}{t('target_size_label')}:{RST} {target_size_mb:.1f} MB")
+            print(f"  {DIM}{reason}.{RST}")
+
         out_path  = safe_output_path(full_path)
         orig_size = os.path.getsize(full_path)
         print(f"\n  {DIM}{t('original_size', size=human_size(orig_size))}{RST}")
@@ -826,7 +906,7 @@ def main():
 
         try:
             ok = compress_video(full_path, out_path, v_idx, selected_audio_tracks, selected_subtitle_tracks,
-                                encoder, current_crf, duration)
+                                encoder, encode_plan, duration)
         except RuntimeError as e:
             print(f"  {R}Error fatal: {e}{RST}")
             continue

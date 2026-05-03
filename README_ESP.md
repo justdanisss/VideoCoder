@@ -231,7 +231,6 @@ Esto te permite inspeccionar las decisiones previstas antes de lanzar el trabajo
 ## Ideas de Futuro
 
 - mejor detección por tipo de contenido: anime, cine con grano, webcam, capturas de pantalla, etc.
-- modo con tamaño objetivo
 - logs e informes más ricos
 - modo de comparación con clips de prueba
 - mejora del pulido general de la interfaz bilingüe

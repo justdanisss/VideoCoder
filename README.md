@@ -231,7 +231,6 @@ This lets you inspect the planned decisions before running the real job.
 ## Roadmap Ideas
 
 - better per-content detection for anime, grainy film, webcam, and screen captures
-- target-size mode
 - richer logs and reports
 - sample clip comparison mode
 - improved multi-language UI cleanup
