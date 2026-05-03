@@ -2,42 +2,26 @@
 
 English | [Español](README_ESP.md)
 
-VideoCoder is a terminal-based batch video compressor for personal movie and TV libraries.
+VideoCoder is a terminal batch compressor for movie and TV libraries. It focuses on practical storage reduction: recursive folder processing, language-aware track cleanup, optional smart renaming, and aggressive HEVC recompression with automatic fallbacks.
 
-It is designed to:
+## Highlights
 
-- reduce file size aggressively while keeping quality as high as possible
-- process full folders recursively
-- automatically choose what to keep from audio and subtitle tracks
-- avoid replacing your original file unless you explicitly allow it
-- support both English and Spanish in the UI
-
-The current project entrypoint is [`main.py`](main.py).
-
-## Features
-
-- Automatic mode with per-file decisions based on codec, bitrate, resolution, and size-per-minute
-- Manual mode for explicit audio/subtitle selection and CRF control
-- Simulation mode with `-S` or `--simulate`
-- Optional deletion of the original file only when the compressed file is smaller
-- Automatic GPU encoder detection with CPU fallback
-- Audio language filtering
-- Subtitle cleanup, with support for keeping forced subtitles when relevant
-- Output safety: compressed files are written as new files with `_compressed` in the name
-- Output rejection if the compressed result is not smaller than the original
-
-## Supported Containers
-
-VideoCoder currently scans these extensions:
-
-- `mp4`
-- `mkv`
-- `avi`
-- `mov`
-- `webm`
-- `ts`
-- `wmv`
-- `m4v`
+- Recursive processing for `mp4`, `mkv`, `avi`, `mov`, `webm`, `ts`, `wmv`, `m4v`
+- Three operating modes:
+  - `Automatic`
+  - `Target Size`
+  - `Manual`
+- Automatic per-file decisions based on codec, bitrate, resolution, duration, and size-per-minute
+- Intelligent downscaling:
+  - `2160p -> 1080p`
+  - `1080p -> 720p`
+  - `720p -> 480p` only under strict conditions
+- Language-aware audio/subtitle selection
+- Forced subtitle preservation when relevant
+- Smart output renaming without network lookups
+- Optional original-file deletion only after a successful, smaller output
+- Simulation mode with `-S` / `--simulate`
+- GPU encoder detection with automatic fallback to CPU `libx265`
 
 ## Requirements
 
@@ -45,199 +29,171 @@ VideoCoder currently scans these extensions:
 - `ffmpeg`
 - `ffprobe`
 
-Recommended:
+Recommended FFmpeg features:
 
-- `ffmpeg` built with `libx265`
-- `ffmpeg` built with `libopus`
+- `libx265`
+- `libopus`
 
 ## Installation
 
-### Option 1: Simple local usage
+Clone the repository and run `main.py`. No Python package install step is required.
 
-1. Clone or download this repository.
-2. Make sure Python 3.10+ is installed.
-3. Make sure `ffmpeg` and `ffprobe` are available in your `PATH`.
-4. Run the script:
+Example dependencies:
 
-```bash
-python3 main.py
-```
-
-### Option 2: Arch Linux
-
-The script includes a dependency check and can prompt to install missing packages with `pacman`.
-
-If you want to install them manually:
+### Arch Linux
 
 ```bash
 sudo pacman -S python ffmpeg
 ```
 
-### Option 3: Debian / Ubuntu
+### Debian / Ubuntu
 
 ```bash
 sudo apt update
 sudo apt install python3 ffmpeg
 ```
 
-### Option 4: Fedora
+### Fedora
 
 ```bash
 sudo dnf install python3 ffmpeg
 ```
 
-## Usage
-
-Run the tool from the project folder:
+## Quick Start
 
 ```bash
 python3 main.py
 ```
 
-The startup flow is:
-
-1. Choose UI language: English or Spanish
-2. Enter the input folder
-3. Decide whether to delete original files when the compressed result is better
-4. Choose compression mode:
-   - Automatic
-   - Manual
-
-### Simulation Mode
-
-Simulation mode analyzes everything but does not compress anything.
+Simulation-only:
 
 ```bash
 python3 main.py -S
 ```
 
-or
+At startup the tool lets you choose:
 
-```bash
-python3 main.py --simulate
-```
+1. UI language
+2. Input folder
+3. Whether the original file should be deleted if the compressed output is better
+4. Whether output files should be smart-renamed
+5. Compression mode
 
-This is useful for checking decisions before processing a large library.
+## Modes
 
-## Compression Modes
+### 1. Automatic
 
-### Automatic Mode
+Best for bulk library compression.
 
-Automatic mode is intended for large libraries and bulk cleanup.
+Behavior:
 
-It will:
+- chooses audio/subtitle tracks automatically from the selected target language
+- removes other-language audio when target-language audio exists
+- removes normal subtitles when matching audio exists
+- keeps forced subtitles when appropriate
+- chooses CRF automatically
+- may reduce resolution automatically when the source is clearly oversized for its effective quality
 
-- inspect codec, bitrate, resolution, and file size
-- choose a compression strength automatically
-- try to preserve high visual quality while reducing file size as much as possible
-- skip files only when they already appear too compressed to safely improve
+### 2. Target Size
 
-Track behavior in automatic mode:
+Best when you want a predictable size budget per file.
 
-- if audio exists in the selected target language, other audio languages are removed from the compressed copy
-- normal subtitles are removed when matching audio is already present
-- forced subtitles can be kept
-- if multiple audio tracks exist in the chosen language, the script lets you choose which one to keep
+Behavior:
 
-### Manual Mode
+- asks for a target size in MB
+- estimates output bitrate from duration and selected tracks
+- can also downscale automatically to help hit the target more realistically
+- still rejects results that are not smaller than the source
 
-Manual mode lets you:
+This mode is approximate, not mathematically exact. It is bitrate-targeted, not strict final-size locking.
 
-- pick audio tracks yourself
-- pick subtitle tracks yourself
-- set a manual `CRF`
+### 3. Manual
 
-Use it when you want full control over a specific file or a small batch.
+Best when you want explicit control.
 
-## Output Behavior
+Behavior:
+
+- manual audio/subtitle selection
+- manual CRF
+- manual output resolution selection
+
+## Resolution Strategy
+
+Resolution is part of the compression strategy, not just a cosmetic option.
+
+- `Automatic` and `Target Size` can decide resolution on their own
+- `Manual` lets you select the output resolution explicitly
+- `480p` is intentionally conservative in automatic modes and is only used in stronger edge cases
+
+## Smart Rename
+
+The smart rename option works locally and does not query online databases.
+
+It is intended to:
+
+- remove common release noise
+- strip download-site clutter
+- normalize separators
+- preserve episode codes such as `S01E05` or `E05`
+- keep movie years when they are clearly present
+
+Examples:
+
+- `Movie.Title.2019.1080p.BluRay.x264-GROUP.mkv`
+  becomes roughly `Movie Title (2019)`
+- `Show.Name.S01E05.720p.WEBRip.x265-GROUP.mkv`
+  becomes roughly `Show Name S01E05`
+
+## Output Rules
 
 VideoCoder never edits the source file in place.
 
-By default:
+Default behavior:
 
-- the original file remains untouched
-- a new output file is created with a `_compressed` suffix
+- source file is kept
+- output is written as a new file
+- standard naming uses `_compressed`
 
-Example:
+If smart rename is enabled, the output stem is cleaned before the `_compressed` suffix is applied.
 
-- `Movie.mkv` -> `Movie_compressed.mkv`
+If original deletion is enabled:
 
-If a `_compressed` file already exists, VideoCoder creates a unique variant such as:
+- the original file is removed only after a successful encode
+- the output must also be smaller than the original
+- if smart rename is enabled, the final surviving file can be renamed to the cleaned title
 
-- `Movie_compressed_2.mkv`
+If compression fails or the output is not smaller:
 
-If you enable original deletion at startup:
-
-- the original file is removed only after the compressed file is successfully created
-- the compressed file must also be smaller than the original
-
-If compression fails or the result is larger:
-
-- the original file is kept
+- the original is kept
 - the bad output is discarded
 
-## Encoder Behavior
+## Encoders
 
-VideoCoder tries to use available HEVC encoders in this order:
+VideoCoder checks for HEVC encoders in this order:
 
 - `hevc_nvenc`
 - `hevc_amf`
 - `hevc_videotoolbox`
 - `libx265`
 
-If a GPU encoder appears available but fails at runtime, the tool automatically retries with CPU `libx265`.
+If a GPU encoder is detected but fails at runtime, the job is retried automatically with CPU `libx265`.
 
-## Audio and Subtitle Notes
+## Notes
 
-- Audio may be copied instead of re-encoded when it already uses a sensible codec and bitrate.
-- Subtitle handling depends on mode and language choices.
-- For `mp4`, subtitle output is limited by container compatibility and may be converted to `mov_text`.
-- For `mkv`, subtitles are generally copied when possible.
+- Audio may be copied instead of re-encoded when it already looks efficient enough.
+- Subtitle behavior depends on container compatibility.
+- `mp4` subtitle output may require conversion to `mov_text`.
+- Any lossy recompression can reduce quality. The tool is designed to balance that risk against storage savings, not eliminate it.
 
-## Safety Notes
+## Roadmap
 
-- The script can delete original files only if you explicitly approve that option at startup.
-- Compression decisions are heuristic-based, not magical; for important media, test on a few files first.
-- Even when preserving quality aggressively, any lossy recompression can introduce some visual loss.
-
-## Example Workflows
-
-### Compress a full TV show folder
-
-```bash
-python3 main.py
-```
-
-- choose `English`
-- select your season folder
-- enable original deletion if you want a fast library cleanup
-- choose `Automatic`
-- select the language you want to keep
-
-### Preview a movie library without writing files
-
-```bash
-python3 main.py -S
-```
-
-This lets you inspect the planned decisions before running the real job.
-
-## Known Limitations
-
-- The UI translation is functional but not yet perfectly polished in every message.
-- Compression decisions are based on heuristics, so edge cases will still exist.
-- Some subtitle formats depend heavily on container support.
-
-## Roadmap Ideas
-
-- better per-content detection for anime, grainy film, webcam, and screen captures
-- richer logs and reports
-- sample clip comparison mode
-- improved multi-language UI cleanup
+- more robust content-type heuristics
+- better reporting / logging
+- optional sample-based comparison workflows
+- further UI translation cleanup
 
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
 
-If you use or redistribute substantial parts of this project, please keep the
-original copyright notice and license text intact, as required by the license.
+If you redistribute substantial portions of the project, keep the copyright notice and license text intact, as required by the license.

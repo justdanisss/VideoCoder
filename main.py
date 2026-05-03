@@ -104,6 +104,67 @@ STRINGS = {
     'target_size_label': {'es': "Tamano objetivo", 'en': "Target Size"},
     'smart_rename_preview': {'es': "Renombrado inteligente: {name}", 'en': "Smart rename: {name}"},
     'final_renamed': {'es': "Renombrado final: {path}", 'en': "Final rename: {path}"},
+    'installing': {'es': "Instalando: {packages}", 'en': "Installing: {packages}"},
+    'ffmpeg_fallback_cpu': {'es': "El encoder GPU fallo. Reintentando con CPU libx265...", 'en': "GPU encoder failed. Retrying with CPU libx265..."},
+    'ffmpeg_errors': {'es': "FFmpeg devolvio estos errores:", 'en': "FFmpeg returned these errors:"},
+    'track_all': {'es': "todas", 'en': "all"},
+    'track_none': {'es': "ninguna", 'en': "none"},
+    'track_numbers_help': {'es': "o numeros separados por coma (ej: 0,2)", 'en': "or comma-separated numbers (example: 0,2)"},
+    'choose_track_prompt': {'es': "  -> Elige una pista: ", 'en': "  -> Choose one track: "},
+    'choose_langs_help': {'es': "Elige uno o varios separados por coma. Ej: 0 o 0,1", 'en': "Choose one or more separated by commas. Example: 0 or 0,1"},
+    'auto_audio_detected': {'es': "Audio objetivo detectado ({names}). Se eliminaran otros idiomas y todos los subtitulos.", 'en': "Target audio detected ({names}). Other languages and normal subtitles will be removed."},
+    'audio_kept': {'es': "Audio conservado: {name}", 'en': "Kept audio: {name}"},
+    'multiple_audio_found': {'es': "Hay varias pistas de audio en los idiomas elegidos.", 'en': "Multiple audio tracks were found in the selected languages."},
+    'choose_audio_to_keep': {'es': "Elige la pista de audio a conservar:", 'en': "Choose the audio track to keep:"},
+    'keep_forced_subs': {'es': "Se conservaran solo los subtitulos forzados.", 'en': "Only forced subtitles will be kept."},
+    'remove_subs_due_audio': {'es': "Subtitulos eliminados porque ya existe audio en el idioma objetivo.", 'en': "Subtitles removed because target-language audio already exists."},
+    'subs_kept': {'es': "Subs conservados: {names}", 'en': "Kept subtitles: {names}"},
+    'no_subs_for_lang': {'es': "Sin subtitulos del idioma elegido.", 'en': "No subtitles found for the selected language."},
+    'no_audio_for_langs': {'es': "'{filename}' no tiene audio en los idiomas elegidos.", 'en': "'{filename}' does not contain audio in the selected languages."},
+    'manual_selection_needed': {'es': "Seleccion manual necesaria:", 'en': "Manual selection required:"},
+    'audio_tracks_label': {'es': "Pistas de audio:", 'en': "Audio tracks:"},
+    'subtitle_tracks_label': {'es': "Subtitulos:", 'en': "Subtitles:"},
+    'crf_prompt': {'es': "CRF (18=mejor/grande -> 28=peor/pequeno) [{default}]: ", 'en': "CRF (18=better/larger -> 28=worse/smaller) [{default}]: "},
+    'between_0_51': {'es': "Entre 0 y 51.", 'en': "Choose a value between 0 and 51."},
+    'integer_required': {'es': "Numero entero.", 'en': "Please enter an integer."},
+    'output_resolution': {'es': "Resolucion de salida", 'en': "Output resolution"},
+    'choose_option': {'es': "  -> Elige opcion: ", 'en': "  -> Choose option: "},
+    'resolution_original': {'es': "Original", 'en': "Original"},
+    'resolution_label': {'es': "Resolucion", 'en': "Resolution"},
+    'skip_recompression': {'es': "Saltando recompresion: {reason}.", 'en': "Skipping recompression: {reason}."},
+    'analysis_error': {'es': "Error analizando: {error}", 'en': "Analysis error: {error}"},
+    'no_video_track': {'es': "Sin pista de video. Saltando.", 'en': "No video track found. Skipping."},
+    'no_audio_default': {'es': "Sin audio -> se conserva el primero.", 'en': "No audio selected -> keeping the first track."},
+    'fatal_error': {'es': "Error fatal: {error}", 'en': "Fatal error: {error}"},
+    'lang_selection_title': {'es': "\nLanguage / Idioma:\n   [1] English\n   [2] Espanol", 'en': "\nLanguage / Idioma:\n   [1] English\n   [2] Espanol"},
+    'track_index_out': {'es': "Indice fuera de rango.", 'en': "Index out of range."},
+    'track_invalid': {'es': "Entrada invalida.", 'en': "Invalid input."},
+    'target_size_prompt': {'es': "Tamano objetivo por archivo en MB [{default}]: ", 'en': "Target size per file in MB [{default}]: "},
+    'target_size_min': {'es': "Pon al menos 20 MB para que tenga sentido.", 'en': "Use at least 20 MB so it makes sense."},
+    'target_size_number': {'es': "Numero valido, por favor.", 'en': "Please enter a valid number."},
+    'without_audio': {'es': "sin audio", 'en': "no audio"},
+    'without_subs': {'es': "sin subtitulos", 'en': "no subtitles"},
+    'forced_tag': {'es': "forzados", 'en': "forced"},
+    'forced_suffix': {'es': " forzados", 'en': " forced"},
+    'copy_mode': {'es': "copiar", 'en': "copy"},
+    'reencode_mode': {'es': "recodificar", 'en': "reencode"},
+    'keep_original_resolution': {'es': "original", 'en': "original"},
+    'unknown_resolution': {'es': "resolucion desconocida", 'en': "unknown resolution"},
+    'unknown_codec': {'es': "codec desconocido", 'en': "unknown codec"},
+    'ffprobe_timeout': {'es': "ffprobe tardo demasiado", 'en': "ffprobe took too long"},
+    'ffprobe_invalid': {'es': "ffprobe devolvio respuesta invalida", 'en': "ffprobe returned an invalid response"},
+    'ffmpeg_missing_runtime': {'es': "ffmpeg no encontrado", 'en': "ffmpeg not found"},
+    'scale_auto_4k_1080': {'es': "fuente 4K detectada, bajando a 1080p para ahorrar mucho espacio", 'en': "4K source detected, downscaling to 1080p for major savings"},
+    'scale_auto_1080_720': {'es': "fuente 1080p inflada detectada, bajando a 720p", 'en': "inflated 1080p source detected, downscaling to 720p"},
+    'scale_auto_720_480': {'es': "fuente 720p muy inflada detectada, bajando a 480p", 'en': "inflated 720p source detected, downscaling to 480p"},
+    'scale_keep_original': {'es': "manteniendo resolucion original", 'en': "keeping original resolution"},
+    'scale_target_4k_1080': {'es': "fuente 4K ajustada a 1080p para alcanzar el tamano objetivo", 'en': "4K source adjusted to 1080p for target size"},
+    'scale_target_1080_720': {'es': "fuente 1080p ajustada a 720p para alcanzar el tamano objetivo", 'en': "1080p source adjusted to 720p for target size"},
+    'scale_target_720_480': {'es': "fuente 720p ajustada a 480p para alcanzar el tamano objetivo", 'en': "720p source adjusted to 480p for target size"},
+    'skip_hevc_low_bitrate': {'es': "ya usa HEVC y su bitrate ({bitrate:.0f} kbps) ya es muy bajo para {height}p", 'en': "it already uses HEVC and its bitrate ({bitrate:.0f} kbps) is already very low for {height}p"},
+    'skip_bitrate_too_low': {'es': "su bitrate ({bitrate:.0f} kbps) ya es demasiado bajo para recomprimir con seguridad", 'en': "its bitrate ({bitrate:.0f} kbps) is already too low to recompress safely"},
+    'target_already_below': {'es': "el archivo ya pesa {size:.1f} MB, por debajo del objetivo", 'en': "the file already weighs {size:.1f} MB, below the target"},
+    'target_plan_reason': {'es': "objetivo {target:.1f} MB, video ~{video} kbps, audio ~{audio} kbps", 'en': "target {target:.1f} MB, video ~{video} kbps, audio ~{audio} kbps"},
 }
 
 
@@ -114,16 +175,16 @@ def t(key, **kwargs):
 
 def choose_ui_language():
     global UI_LANG
-    print(STRINGS['choose_ui_lang']['es'])
+    print(t('lang_selection_title'))
     while True:
-        raw = input(STRINGS['choose_ui_lang_prompt']['es']).strip()
+        raw = input(t('choose_ui_lang_prompt')).strip()
         if raw == '1':
             UI_LANG = 'en'
             return
         if raw == '2':
             UI_LANG = 'es'
             return
-        print(f"  {R}{STRINGS['invalid_1_2']['es']}{RST}")
+        print(f"  {R}{t('invalid_1_2')}{RST}")
 
 
 def ask_yes_no(prompt_key, default=False, **kwargs):
@@ -147,7 +208,7 @@ def _cmd_exists(name):
     return shutil.which(name) is not None
 
 def _pacman_install(packages):
-    print(f"{Y}  Instalando: {' '.join(packages)}{RST}")
+    print(f"{Y}  {t('installing', packages=' '.join(packages))}{RST}")
     return subprocess.run(['sudo', 'pacman', '-S', '--needed', '--noconfirm'] + packages).returncode == 0
 
 def _ffmpeg_has_codec(codec):
@@ -298,9 +359,9 @@ def get_video_info(file_path):
             raise RuntimeError(r.stderr.strip())
         return json.loads(r.stdout)
     except subprocess.TimeoutExpired:
-        raise RuntimeError("ffprobe tardo demasiado")
+        raise RuntimeError(t('ffprobe_timeout'))
     except json.JSONDecodeError:
-        raise RuntimeError("ffprobe devolvio respuesta invalida")
+        raise RuntimeError(t('ffprobe_invalid'))
 
 
 # ── Progreso ──────────────────────────────────
@@ -378,18 +439,18 @@ def compress_video(input_path, output_path, v_map, a_maps, s_maps, encoder, enco
 
             stderr_text = "\n".join(stderr_lines)
             if attempt == 0 and _should_fallback_to_cpu(stderr_text, selected_encoder):
-                print(f"{Y}El encoder GPU fallo. Reintentando con CPU libx265...{RST}")
+                print(f"{Y}{t('ffmpeg_fallback_cpu')}{RST}")
                 selected_encoder = 'libx265'
                 continue
 
             if stderr_lines:
-                print(f"{R}FFmpeg devolvio estos errores:{RST}")
+                print(f"{R}{t('ffmpeg_errors')}{RST}")
                 for line in stderr_lines[-20:]:
                     if line.strip():
                         print(f"  {line}")
             return False
     except FileNotFoundError:
-        raise RuntimeError("ffmpeg no encontrado")
+        raise RuntimeError(t('ffmpeg_missing_runtime'))
     finally:
         _current_output = None
 
@@ -406,14 +467,14 @@ def pick_tracks(label, tracks, allow_none=False):
         return []
     print(f"\n  {BOLD}{label}{RST}")
     for i, track in enumerate(tracks):
-        forced = " forced" if track.get('forced') else ""
+        forced = t('forced_suffix') if track.get('forced') else ""
         print(f"   {C}[{i}]{RST} stream #{track['index']}  lang={Y}{track['lang']}{RST}  {DIM}{track['extra']}{forced}{RST}")
-    hint = f"{C}a{RST}=todas"
+    hint = f"{C}a{RST}={t('track_all')}"
     if allow_none:
-        hint += f"  {C}n{RST}=ninguna"
-    hint += "  o numeros separados por coma (ej: 0,2)"
+        hint += f"  {C}n{RST}={t('track_none')}"
+    hint += f"  {t('track_numbers_help')}"
     while True:
-        raw = input(f"  -> Elige ({hint}): ").strip()
+        raw = input(t('track_choice', hint=hint)).strip()
         if _is_all(raw):
             return [t['index'] for t in tracks]
         if allow_none and _is_none(raw):
@@ -422,9 +483,9 @@ def pick_tracks(label, tracks, allow_none=False):
             chosen = [int(x.strip()) for x in raw.split(',') if x.strip()]
             if chosen and all(0 <= c < len(tracks) for c in chosen):
                 return [tracks[c]['index'] for c in chosen]
-            print(f"  {R}Indice fuera de rango.{RST}")
+            print(f"  {R}{t('track_index_out')}{RST}")
         except ValueError:
-            print(f"  {R}Entrada invalida.{RST}")
+            print(f"  {R}{t('track_invalid')}{RST}")
 
 
 def pick_one_track(label, tracks):
@@ -432,17 +493,17 @@ def pick_one_track(label, tracks):
         return []
     print(f"\n  {BOLD}{label}{RST}")
     for i, track in enumerate(tracks):
-        forced = " forced" if track.get('forced') else ""
+        forced = t('forced_suffix') if track.get('forced') else ""
         print(f"   {C}[{i}]{RST} stream #{track['index']}  lang={Y}{track['lang']}{RST}  {DIM}{track['extra']}{forced}{RST}")
     while True:
-        raw = input("  -> Elige una pista: ").strip()
+        raw = input(t('choose_track_prompt')).strip()
         try:
             chosen = int(raw)
             if 0 <= chosen < len(tracks):
                 return [tracks[chosen]['index']]
-            print(f"  {R}Indice fuera de rango.{RST}")
+            print(f"  {R}{t('track_index_out')}{RST}")
         except ValueError:
-            print(f"  {R}Entrada invalida.{RST}")
+            print(f"  {R}{t('track_invalid')}{RST}")
 
 
 # ── Modo automatico ───────────────────────────
@@ -458,7 +519,7 @@ def choose_target_langs():
     codes = list(LANG_MAP.keys())
     for i, code in enumerate(codes):
         print(f"   {C}[{i}]{RST} {LANG_NAMES[code]}")
-    print(f"\n  {'Elige uno o varios separados por coma. Ej: 0  o  0,1' if UI_LANG == 'es' else 'Choose one or more separated by commas. Example: 0 or 0,1'}")
+    print(f"\n  {t('choose_langs_help')}")
     while True:
         raw = input(t('choose_keep_langs')).strip()
         try:
@@ -480,19 +541,19 @@ def auto_select_tracks(audios, subs, target_langs, filename):
 
     if matched_audio_tracks:
         target_names = ', '.join(LANG_NAMES.get(code, code) for code in target_langs)
-        print(f"  {G}Audio objetivo detectado ({target_names}). Se eliminaran otros idiomas y todos los subtitulos.{RST}")
+        print(f"  {G}{t('auto_audio_detected', names=target_names)}{RST}")
         if len(matched_audio_tracks) == 1:
             selected_a = [matched_audio_tracks[0]['index']]
             kept_name = LANG_NAMES.get(_normalize_lang(matched_audio_tracks[0]['lang']), matched_audio_tracks[0]['lang'])
-            print(f"  {G}Audio conservado: {kept_name}{RST}")
+            print(f"  {G}{t('audio_kept', name=kept_name)}{RST}")
         else:
-            print(f"  {Y}Hay varias pistas de audio en los idiomas elegidos.{RST}")
-            selected_a = pick_one_track("Elige la pista de audio a conservar:", matched_audio_tracks)
+            print(f"  {Y}{t('multiple_audio_found')}{RST}")
+            selected_a = pick_one_track(t('choose_audio_to_keep'), matched_audio_tracks)
         forced_subs = [track['index'] for track in subs if track.get('forced')]
         if forced_subs:
-            print(f"  {DIM}Se conservaran solo los subtitulos forzados.{RST}")
+            print(f"  {DIM}{t('keep_forced_subs')}{RST}")
         else:
-            print(f"  {DIM}Subtitulos eliminados porque ya existe audio en el idioma objetivo.{RST}")
+            print(f"  {DIM}{t('remove_subs_due_audio')}{RST}")
         return selected_a, forced_subs
 
     matched_audio = [track['index'] for track in audios if matches(track['lang'])]
@@ -503,59 +564,56 @@ def auto_select_tracks(audios, subs, target_langs, filename):
             LANG_NAMES.get(_normalize_lang(track['lang']), track['lang'])
             for track in audios if matches(track['lang'])
         )
-        print(f"  {G}Audio conservado: {a_names}{RST}")
+        print(f"  {G}{t('audio_kept', name=a_names)}{RST}")
         if matched_subs:
             s_names = ', '.join(
                 LANG_NAMES.get(_normalize_lang(track['lang']), track['lang'])
                 for track in subs if track['index'] in matched_subs
             )
-            print(f"  {G}Subs conservados: {s_names}{RST}")
+            print(f"  {G}{t('subs_kept', names=s_names)}{RST}")
         else:
-            print(f"  {DIM}Sin subtitulos del idioma elegido.{RST}")
+            print(f"  {DIM}{t('no_subs_for_lang')}{RST}")
         return matched_audio, matched_subs
     else:
         # No hay audio en el idioma objetivo → seleccion manual
-        print(f"\n  {Y}'{filename}' no tiene audio en los idiomas elegidos.{RST}")
-        print(f"  {Y}Seleccion manual necesaria:{RST}")
-        selected_a = pick_tracks("Pistas de audio:", audios)
-        selected_s = pick_tracks("Subtitulos:", subs, allow_none=True)
+        print(f"\n  {Y}{t('no_audio_for_langs', filename=filename)}{RST}")
+        print(f"  {Y}{t('manual_selection_needed')}{RST}")
+        selected_a = pick_tracks(t('audio_tracks_label'), audios)
+        selected_s = pick_tracks(t('subtitle_tracks_label'), subs, allow_none=True)
         return selected_a, selected_s
 
 
 # ── Utilidades ────────────────────────────────
 def ask_crf(default=24):
     while True:
-        raw = input(f"\n  {BOLD}CRF{RST} (18=mejor/grande -> 28=peor/pequeno) [{default}]: ").strip()
+        raw = input(f"\n  {BOLD}{t('crf_prompt', default=default)}{RST}").strip()
         if raw == '':
             return default
         try:
             v = int(raw)
             if 0 <= v <= 51:
                 return v
-            print(f"  {R}Entre 0 y 51.{RST}")
+            print(f"  {R}{t('between_0_51')}{RST}")
         except ValueError:
-            print(f"  {R}Numero entero.{RST}")
+            print(f"  {R}{t('integer_required')}{RST}")
 
 
 def ask_target_size_mb(default=120):
     while True:
-        label = "Tamano objetivo por archivo en MB" if UI_LANG == 'es' else "Target size per file in MB"
-        raw = input(f"\n  {BOLD}{label}{RST} [{default}]: ").strip()
+        raw = input(f"\n  {BOLD}{t('target_size_prompt', default=default)}{RST}").strip()
         if raw == '':
             return default
         try:
             value = float(raw.replace(',', '.'))
             if value >= 20:
                 return value
-            msg = "Pon al menos 20 MB para que tenga sentido." if UI_LANG == 'es' else "Use at least 20 MB so it makes sense."
-            print(f"  {R}{msg}{RST}")
+            print(f"  {R}{t('target_size_min')}{RST}")
         except ValueError:
-            msg = "Numero valido, por favor." if UI_LANG == 'es' else "Please enter a valid number."
-            print(f"  {R}{msg}{RST}")
+            print(f"  {R}{t('target_size_number')}{RST}")
 
 
 def ask_resolution_target(source_height):
-    options = [('0', 'Original', 0)]
+    options = [('0', t('resolution_original'), 0)]
     if source_height >= 2160:
         options.append(('1', '1080p', 1080))
     if source_height >= 1080:
@@ -563,13 +621,13 @@ def ask_resolution_target(source_height):
     if source_height >= 720:
         options.append(('3', '480p', 480))
 
-    print(f"\n  {BOLD}{'Resolucion de salida' if UI_LANG == 'es' else 'Output resolution'}{RST}")
+    print(f"\n  {BOLD}{t('output_resolution')}{RST}")
     for key, label, _ in options:
         print(f"   {C}[{key}]{RST} {label}")
 
     valid = {key: value for key, _, value in options}
     while True:
-        raw = input(f"  -> {'Elige opcion' if UI_LANG == 'es' else 'Choose option'}: ").strip()
+        raw = input(t('choose_option')).strip()
         if raw in valid:
             return valid[raw]
         print(f"  {R}{t('invalid_1_2')}{RST}")
@@ -614,22 +672,22 @@ def estimate_audio_bitrate_kbps(audio_tracks):
 
 def summarize_audio_plan(audio_tracks):
     if not audio_tracks:
-        return "sin audio"
+        return t('without_audio')
     parts = []
     for track in audio_tracks:
-        mode = "copy" if track.get('copy_ok') else "reencode"
+        mode = t('copy_mode') if track.get('copy_ok') else t('reencode_mode')
         parts.append(f"#{track['index']} {track['codec']} {track['lang']} [{mode}]")
     return ', '.join(parts)
 
 
 def summarize_subtitle_plan(subtitle_tracks):
     if not subtitle_tracks:
-        return "sin subtitulos"
+        return t('without_subs')
     parts = []
     for track in subtitle_tracks:
         label = f"#{track['index']} {track['lang']}"
         if track.get('forced'):
-            label += " forced"
+            label += f" {t('forced_tag')}"
         parts.append(label)
     return ', '.join(parts)
 
@@ -643,28 +701,28 @@ def choose_auto_scale(video_stream, format_info, crf):
     size_per_min_mb = size_mb / max(duration / 60.0, 1.0)
 
     if height >= 2160:
-        return 1080, "4K source detected, downscaling to 1080p for major savings"
+        return 1080, t('scale_auto_4k_1080')
     if height >= 1080 and (bitrate_kbps >= 4500 or size_per_min_mb >= 18 or crf >= 26):
-        return 720, "inflated 1080p source detected, downscaling to 720p"
+        return 720, t('scale_auto_1080_720')
     if height >= 720 and (bitrate_kbps >= 4200 or size_per_min_mb >= 22) and crf >= 28:
-        return 480, "inflated 720p source detected, downscaling to 480p"
-    return 0, "keeping original resolution"
+        return 480, t('scale_auto_720_480')
+    return 0, t('scale_keep_original')
 
 
 def choose_target_scale(video_stream, target_size_mb, target_total_kbps):
     height = _safe_int(video_stream.get('height'))
     if height >= 2160:
-        return 1080, "4K source adjusted to 1080p for target size"
+        return 1080, t('scale_target_4k_1080')
     if height >= 1080 and (target_size_mb <= 180 or target_total_kbps <= 2200):
-        return 720, "1080p source adjusted to 720p for target size"
+        return 720, t('scale_target_1080_720')
     if height >= 720 and (target_size_mb <= 55 or target_total_kbps <= 700):
-        return 480, "720p source adjusted to 480p for target size"
-    return 0, "keeping original resolution"
+        return 480, t('scale_target_720_480')
+    return 0, t('scale_keep_original')
 
 
 def summarize_scale(scale_height):
     if not scale_height:
-        return "original"
+        return t('keep_original_resolution')
     return f"{scale_height}p"
 
 
@@ -692,12 +750,10 @@ def choose_auto_crf(video_stream, format_info):
     size_per_min_mb = size_mb / max(duration / 60.0, 1.0)
 
     if is_hevc and bitrate_kbps and bitrate_kbps <= very_low_kbps:
-        return None, (
-            f"ya usa HEVC y su bitrate ({bitrate_kbps:.0f} kbps) ya es muy bajo para {height or '?'}p"
-        )
+        return None, t('skip_hevc_low_bitrate', bitrate=bitrate_kbps, height=height or '?')
 
     if bitrate_kbps and bitrate_kbps <= max(350, very_low_kbps * 0.7):
-        return None, f"su bitrate ({bitrate_kbps:.0f} kbps) ya es demasiado bajo para recomprimir con seguridad"
+        return None, t('skip_bitrate_too_low', bitrate=bitrate_kbps)
 
     if is_hevc:
         crf = 24
@@ -729,7 +785,7 @@ def choose_auto_crf(video_stream, format_info):
 
     crf = max(24, min(28, crf))
     reason = (
-        f"{codec or 'codec desconocido'}, {height or '?'}p, {bitrate_kbps:.0f} kbps, "
+        f"{codec or t('unknown_codec')}, {height or '?'}p, {bitrate_kbps:.0f} kbps, "
         f"{size_per_min_mb:.1f} MB/min"
     )
     return crf, reason
@@ -826,7 +882,7 @@ def summarize_video_plan(video_stream, format_info, crf):
     height = _safe_int(video_stream.get('height'))
     bitrate = _safe_int(video_stream.get('bit_rate')) or _safe_int(format_info.get('bit_rate'))
     bitrate_kbps = bitrate / 1000 if bitrate else 0
-    resolution = f"{width}x{height}" if width and height else "resolucion desconocida"
+    resolution = f"{width}x{height}" if width and height else t('unknown_resolution')
     return f"{codec}, {resolution}, {bitrate_kbps:.0f} kbps -> CRF {crf}"
 
 
@@ -834,7 +890,7 @@ def build_target_size_plan(format_info, audio_tracks, subtitle_tracks, target_si
     duration = max(float(format_info.get('duration', 0) or 0), 1.0)
     original_size_mb = _safe_int(format_info.get('size')) / (1024 * 1024)
     if original_size_mb and original_size_mb <= target_size_mb:
-        return None, f"el archivo ya pesa {original_size_mb:.1f} MB, por debajo del objetivo"
+        return None, t('target_already_below', size=original_size_mb)
 
     target_total_kbps = max(300, int((target_size_mb * 8192) / duration))
     audio_kbps = estimate_audio_bitrate_kbps(audio_tracks)
@@ -849,7 +905,7 @@ def build_target_size_plan(format_info, audio_tracks, subtitle_tracks, target_si
         'total_bitrate_k': target_total_kbps,
         'scale_height': 0,
     }
-    reason = f"objetivo {target_size_mb:.1f} MB, video ~{video_kbps} kbps, audio ~{audio_kbps} kbps"
+    reason = t('target_plan_reason', target=target_size_mb, video=video_kbps, audio=audio_kbps)
     return plan, reason
 
 
@@ -933,7 +989,7 @@ def main():
         try:
             info = get_video_info(full_path)
         except RuntimeError as e:
-            print(f"  {R}Error analizando: {e}{RST}")
+            print(f"  {R}{t('analysis_error', error=e)}{RST}")
             continue
 
         streams  = info.get('streams', [])
@@ -975,17 +1031,17 @@ def main():
                 })
 
         if v_idx is None or video_stream is None:
-            print(f"  {R}Sin pista de video. Saltando.{RST}")
+            print(f"  {R}{t('no_video_track')}{RST}")
             continue
 
         if modo in ('1', '2') and target_langs:
             selected_a, selected_s = auto_select_tracks(audios, subs, target_langs, file)
         else:
-            selected_a = pick_tracks("Pistas de audio:", audios)
-            selected_s = pick_tracks("Subtitulos:", subs, allow_none=True)
+            selected_a = pick_tracks(t('audio_tracks_label'), audios)
+            selected_s = pick_tracks(t('subtitle_tracks_label'), subs, allow_none=True)
 
         if not selected_a:
-            print(f"  {Y}Sin audio -> se conserva el primero.{RST}")
+            print(f"  {Y}{t('no_audio_default')}{RST}")
             selected_a = [audios[0]['index']] if audios else []
 
         source_height = _safe_int(video_stream.get('height'))
@@ -993,13 +1049,13 @@ def main():
         if modo == '1':
             current_crf, reason = choose_auto_crf(video_stream, format_info)
             if current_crf is None:
-                print(f"  {Y}Saltando recompresion: {reason}.{RST}")
+                print(f"  {Y}{t('skip_recompression', reason=reason)}{RST}")
                 continue
             auto_scale, scale_reason = choose_auto_scale(video_stream, format_info, current_crf)
             encode_plan = {'kind': 'crf', 'crf': current_crf, 'scale_height': auto_scale}
             print(f"  {C}{t('automatic_decision')}{RST} {summarize_video_plan(video_stream, format_info, current_crf)}")
             print(f"  {DIM}{t('reason', reason=reason)}{RST}")
-            print(f"  {DIM}Resolution: {summarize_scale(auto_scale)} ({scale_reason}){RST}")
+            print(f"  {DIM}{t('resolution_label')}: {summarize_scale(auto_scale)} ({scale_reason}){RST}")
 
         selected_audio_tracks = []
         audio_by_index = {track['index']: track for track in audios}
@@ -1027,7 +1083,7 @@ def main():
                 format_info, selected_audio_tracks, selected_subtitle_tracks, target_size_mb
             )
             if encode_plan is None:
-                print(f"  {Y}Saltando recompresion: {reason}.{RST}")
+                print(f"  {Y}{t('skip_recompression', reason=reason)}{RST}")
                 continue
             target_scale, scale_reason = choose_target_scale(
                 video_stream, target_size_mb, encode_plan['total_bitrate_k']
@@ -1035,7 +1091,7 @@ def main():
             encode_plan['scale_height'] = target_scale
             print(f"  {C}{t('target_size_label')}:{RST} {target_size_mb:.1f} MB")
             print(f"  {DIM}{reason}.{RST}")
-            print(f"  {DIM}Resolution: {summarize_scale(target_scale)} ({scale_reason}){RST}")
+            print(f"  {DIM}{t('resolution_label')}: {summarize_scale(target_scale)} ({scale_reason}){RST}")
         elif modo == '3':
             manual_scale = ask_resolution_target(source_height)
             encode_plan['scale_height'] = manual_scale
@@ -1055,7 +1111,7 @@ def main():
             ok = compress_video(full_path, out_path, v_idx, selected_audio_tracks, selected_subtitle_tracks,
                                 encoder, encode_plan, duration)
         except RuntimeError as e:
-            print(f"  {R}Error fatal: {e}{RST}")
+            print(f"  {R}{t('fatal_error', error=e)}{RST}")
             continue
 
         if ok and os.path.exists(out_path):

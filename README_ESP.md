@@ -2,42 +2,26 @@
 
 [English](README.md) | Español
 
-VideoCoder es un compresor de vídeo por lotes para terminal, pensado para bibliotecas personales de películas y series.
+VideoCoder es un compresor por lotes para terminal orientado a bibliotecas de películas y series. La idea es sencilla: reducir almacenamiento de forma agresiva, limpiar pistas innecesarias, renombrar mejor los archivos y tomar decisiones automáticas razonables sin depender de servicios externos.
 
-Está diseñado para:
+## Resumen
 
-- reducir el tamaño de los archivos de forma agresiva manteniendo la mayor calidad posible
-- procesar carpetas completas de forma recursiva
-- decidir automáticamente qué pistas de audio y subtítulos conservar
-- evitar reemplazar el archivo original salvo que tú lo autorices
-- ofrecer interfaz tanto en inglés como en español
-
-El punto de entrada actual del proyecto es [`main.py`](main.py).
-
-## Características
-
-- Modo automático con decisiones por archivo basadas en codec, bitrate, resolución y tamaño por minuto
-- Modo manual para elegir pistas de audio/subtítulos y controlar el CRF
-- Modo simulación con `-S` o `--simulate`
-- Eliminación opcional del archivo original solo si el archivo comprimido es más pequeño
-- Detección automática de encoder GPU con fallback a CPU
-- Filtrado de audio por idioma
-- Limpieza de subtítulos, con soporte para conservar subtítulos forzados cuando convenga
-- Seguridad en la salida: los archivos comprimidos se escriben como archivos nuevos con sufijo `_compressed`
-- Descarte automático si el resultado comprimido no mejora el tamaño del original
-
-## Contenedores Soportados
-
-Actualmente VideoCoder analiza estas extensiones:
-
-- `mp4`
-- `mkv`
-- `avi`
-- `mov`
-- `webm`
-- `ts`
-- `wmv`
-- `m4v`
+- Procesamiento recursivo para `mp4`, `mkv`, `avi`, `mov`, `webm`, `ts`, `wmv`, `m4v`
+- Tres modos de trabajo:
+  - `Automático`
+  - `Tamaño objetivo`
+  - `Manual`
+- Decisiones automáticas por archivo según codec, bitrate, resolución, duración y tamaño por minuto
+- Escalado inteligente de resolución:
+  - `2160p -> 1080p`
+  - `1080p -> 720p`
+  - `720p -> 480p` solo en casos más restrictivos
+- Selección de audio y subtítulos por idioma
+- Conservación de subtítulos forzados cuando conviene
+- Renombrado inteligente local, sin consultas online
+- Eliminación opcional del original solo si la salida es correcta y más pequeña
+- Modo simulación con `-S` / `--simulate`
+- Detección de encoder GPU con fallback automático a CPU `libx265`
 
 ## Requisitos
 
@@ -45,199 +29,171 @@ Actualmente VideoCoder analiza estas extensiones:
 - `ffmpeg`
 - `ffprobe`
 
-Recomendado:
+Recomendado en FFmpeg:
 
-- `ffmpeg` compilado con `libx265`
-- `ffmpeg` compilado con `libopus`
+- `libx265`
+- `libopus`
 
 ## Instalación
 
-### Opción 1: uso local simple
+Clona el repositorio y ejecuta `main.py`. No hay dependencias Python adicionales que instalar.
 
-1. Clona o descarga este repositorio.
-2. Asegúrate de tener Python 3.10 o superior instalado.
-3. Asegúrate de que `ffmpeg` y `ffprobe` estén disponibles en tu `PATH`.
-4. Ejecuta el script:
+Ejemplos de dependencias del sistema:
 
-```bash
-python3 main.py
-```
-
-### Opción 2: Arch Linux
-
-El script incluye una comprobación de dependencias y puede pedirte instalar paquetes faltantes con `pacman`.
-
-Si prefieres instalarlos manualmente:
+### Arch Linux
 
 ```bash
 sudo pacman -S python ffmpeg
 ```
 
-### Opción 3: Debian / Ubuntu
+### Debian / Ubuntu
 
 ```bash
 sudo apt update
 sudo apt install python3 ffmpeg
 ```
 
-### Opción 4: Fedora
+### Fedora
 
 ```bash
 sudo dnf install python3 ffmpeg
 ```
 
-## Uso
-
-Ejecuta la herramienta desde la carpeta del proyecto:
+## Inicio Rápido
 
 ```bash
 python3 main.py
 ```
 
-El flujo inicial es:
-
-1. Elegir idioma de la interfaz: inglés o español
-2. Introducir la carpeta de entrada
-3. Decidir si quieres borrar los archivos originales cuando la versión comprimida sea mejor
-4. Elegir modo de compresión:
-   - Automático
-   - Manual
-
-### Modo Simulación
-
-El modo simulación analiza todo pero no comprime nada.
+Solo simulación:
 
 ```bash
 python3 main.py -S
 ```
 
-o
+Al arrancar, la herramienta te deja elegir:
 
-```bash
-python3 main.py --simulate
-```
+1. Idioma de la interfaz
+2. Carpeta de entrada
+3. Si quieres borrar el original cuando la salida sea mejor
+4. Si quieres usar renombrado inteligente en la salida
+5. Modo de compresión
 
-Es útil para revisar decisiones antes de procesar una biblioteca grande.
+## Modos
 
-## Modos de Compresión
+### 1. Automático
 
-### Modo Automático
+Pensado para comprimir una biblioteca grande con la menor intervención posible.
 
-El modo automático está pensado para bibliotecas grandes y limpiezas por lotes.
+Comportamiento:
 
-Hace lo siguiente:
+- selecciona audio y subtítulos automáticamente según el idioma objetivo
+- elimina audios de otros idiomas cuando ya existe audio en el idioma elegido
+- elimina subtítulos normales cuando el audio del idioma objetivo ya existe
+- conserva subtítulos forzados cuando corresponde
+- decide el `CRF` automáticamente
+- puede bajar resolución si detecta que el archivo está claramente sobredimensionado
 
-- inspecciona codec, bitrate, resolución y tamaño del archivo
-- elige automáticamente una intensidad de compresión
-- intenta preservar la mayor calidad visual posible mientras reduce al máximo el tamaño
-- solo omite archivos cuando parecen ya demasiado comprimidos como para mejorarlos con seguridad
+### 2. Tamaño objetivo
 
-Comportamiento de pistas en modo automático:
+Pensado para trabajar con una meta aproximada de MB por archivo.
 
-- si existe audio en el idioma objetivo seleccionado, los demás idiomas de audio se eliminan de la copia comprimida
-- los subtítulos normales se eliminan cuando ya existe audio en el idioma correspondiente
-- los subtítulos forzados pueden conservarse
-- si hay varias pistas de audio en el idioma elegido, el script te deja escoger cuál conservar
+Comportamiento:
 
-### Modo Manual
+- pide un tamaño objetivo en MB
+- estima el bitrate de salida a partir de la duración y de las pistas conservadas
+- también puede bajar resolución automáticamente si hace falta para acercarse al objetivo
+- sigue descartando resultados que no mejoren el tamaño del archivo original
 
-El modo manual te permite:
+No es un bloqueo exacto de tamaño final; es una aproximación basada en bitrate objetivo.
 
-- elegir tú mismo las pistas de audio
-- elegir tú mismo las pistas de subtítulos
-- fijar un `CRF` manualmente
+### 3. Manual
 
-Úsalo cuando quieras control total sobre un archivo concreto o un lote pequeño.
+Pensado para control total sobre cada archivo.
 
-## Comportamiento de la Salida
+Comportamiento:
 
-VideoCoder nunca edita el archivo original en el mismo sitio.
+- selección manual de audio y subtítulos
+- `CRF` manual
+- resolución de salida manual
 
-Por defecto:
+## Estrategia de Resolución
 
-- el archivo original permanece intacto
-- se crea un archivo nuevo con sufijo `_compressed`
+La resolución forma parte de la compresión, no es un detalle secundario.
 
-Ejemplo:
+- `Automático` y `Tamaño objetivo` pueden decidir la resolución por sí solos
+- `Manual` te deja elegirla explícitamente
+- `480p` está limitado de forma bastante conservadora en los modos automáticos
 
-- `Pelicula.mkv` -> `Pelicula_compressed.mkv`
+## Renombrado Inteligente
 
-Si ya existe un archivo `_compressed`, VideoCoder crea una variante única, por ejemplo:
+La opción de renombrado inteligente trabaja en local y no consulta bases de datos online.
 
-- `Pelicula_compressed_2.mkv`
+Su objetivo es:
 
-Si activas la eliminación del original al inicio:
+- eliminar basura típica de releases
+- quitar nombres de webs o fuentes de descarga
+- normalizar separadores
+- conservar patrones de episodio como `S01E05` o `E05`
+- mantener el año en películas cuando está claramente presente
 
-- el archivo original se elimina solo después de crear correctamente el archivo comprimido
-- además, el archivo comprimido debe ser más pequeño que el original
+Ejemplos:
 
-Si la compresión falla o el resultado sale más grande:
+- `Movie.Title.2019.1080p.BluRay.x264-GROUP.mkv`
+  queda aproximadamente como `Movie Title (2019)`
+- `Show.Name.S01E05.720p.WEBRip.x265-GROUP.mkv`
+  queda aproximadamente como `Show Name S01E05`
+
+## Reglas de Salida
+
+VideoCoder nunca modifica el archivo fuente en el mismo nombre.
+
+Comportamiento por defecto:
+
+- el original se conserva
+- la salida se escribe como archivo nuevo
+- el patrón estándar usa sufijo `_compressed`
+
+Si el renombrado inteligente está activo, primero limpia el nombre base y luego aplica `_compressed`.
+
+Si activas el borrado del original:
+
+- el original solo se elimina después de una compresión correcta
+- la salida debe ser además más pequeña que el original
+- si el renombrado inteligente está activo, el archivo final superviviente puede quedarse con el nombre limpio
+
+Si la compresión falla o la salida no mejora tamaño:
 
 - el original se conserva
 - la salida mala se descarta
 
-## Comportamiento del Encoder
+## Encoders
 
-VideoCoder intenta usar encoders HEVC disponibles en este orden:
+VideoCoder busca encoders HEVC en este orden:
 
 - `hevc_nvenc`
 - `hevc_amf`
 - `hevc_videotoolbox`
 - `libx265`
 
-Si un encoder GPU parece disponible pero falla al ejecutarse, la herramienta reintenta automáticamente con `libx265` en CPU.
+Si detecta un encoder GPU pero falla al ejecutarse, reintenta automáticamente con `libx265` en CPU.
 
-## Notas sobre Audio y Subtítulos
+## Notas
 
-- El audio puede copiarse en lugar de recodificarse cuando ya usa un codec y bitrate razonables.
-- El tratamiento de subtítulos depende del modo y del idioma seleccionado.
-- En `mp4`, la salida de subtítulos está limitada por la compatibilidad del contenedor y puede convertirse a `mov_text`.
-- En `mkv`, los subtítulos normalmente se copian cuando es posible.
+- El audio puede copiarse en lugar de recodificarse si ya parece suficientemente eficiente.
+- El tratamiento de subtítulos depende del contenedor y de la compatibilidad de salida.
+- En `mp4`, algunos subtítulos pueden requerir conversión a `mov_text`.
+- Toda recompresión con pérdida puede reducir calidad. El objetivo aquí es equilibrar ese coste visual con un ahorro real de espacio.
 
-## Notas de Seguridad
+## Roadmap
 
-- El script solo puede borrar archivos originales si tú apruebas explícitamente esa opción al inicio.
-- Las decisiones de compresión están basadas en heurísticas; no son mágicas, así que conviene probar antes con unos pocos archivos importantes.
-- Incluso intentando preservar al máximo la calidad, cualquier recompresión con pérdida puede introducir alguna degradación visual.
-
-## Ejemplos de Uso
-
-### Comprimir una carpeta completa de una serie
-
-```bash
-python3 main.py
-```
-
-- elige `English` o `Español`
-- selecciona la carpeta de la temporada
-- activa la eliminación del original si quieres limpiar la biblioteca más rápido
-- elige `Automatico`
-- selecciona el idioma que quieres conservar
-
-### Previsualizar una biblioteca de películas sin escribir archivos
-
-```bash
-python3 main.py -S
-```
-
-Esto te permite inspeccionar las decisiones previstas antes de lanzar el trabajo real.
-
-## Limitaciones Conocidas
-
-- La traducción de la interfaz funciona, pero todavía no está perfectamente pulida en todos los mensajes.
-- Las decisiones de compresión están basadas en heurísticas, así que seguirán existiendo casos límite.
-- Algunos formatos de subtítulos dependen mucho del soporte del contenedor.
-
-## Ideas de Futuro
-
-- mejor detección por tipo de contenido: anime, cine con grano, webcam, capturas de pantalla, etc.
-- logs e informes más ricos
-- modo de comparación con clips de prueba
-- mejora del pulido general de la interfaz bilingüe
+- heurísticas más finas por tipo de contenido
+- mejores logs e informes
+- flujos opcionales de comparación por muestras
+- más pulido en la interfaz bilingüe
 
 ## Licencia
 
 Este proyecto está licenciado bajo la [Licencia MIT](LICENSE).
 
-Si usas o redistribuyes partes sustanciales de este proyecto, conserva el aviso
-de copyright original y el texto de la licencia, tal como exige la licencia.
+Si redistribuyes partes sustanciales del proyecto, conserva el aviso de copyright y el texto de la licencia, tal como exige la licencia.
