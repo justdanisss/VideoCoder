@@ -2,26 +2,31 @@
 
 English | [Español](README_ESP.md)
 
-VideoCoder is a terminal batch compressor for movie and TV libraries. It focuses on practical storage reduction: recursive folder processing, language-aware track cleanup, optional smart renaming, and aggressive HEVC recompression with automatic fallbacks.
+VideoCoder is a terminal video compressor for movie and TV libraries. It is designed for batch use: recursive processing, aggressive HEVC recompression, optional language-based track cleanup, smart local renaming, and automatic fallback from GPU encoders to CPU `libx265`.
 
-## Highlights
+## Features
 
-- Recursive processing for `mp4`, `mkv`, `avi`, `mov`, `webm`, `ts`, `wmv`, `m4v`
-- Three operating modes:
+- Recursive scanning for `mp4`, `mkv`, `avi`, `mov`, `webm`, `ts`, `wmv`, `m4v`
+- Two top-level modes:
   - `Automatic`
-  - `Target Size`
   - `Manual`
-- Automatic per-file decisions based on codec, bitrate, resolution, duration, and size-per-minute
-- Intelligent downscaling:
-  - `2160p -> 1080p`
-  - `1080p -> 720p`
-  - `720p -> 480p` only under strict conditions
-- Language-aware audio/subtitle selection
+- Automatic compression profiles:
+  - `Medium`
+  - `High`
+  - `Extreme`
+  - `Custom target size per file`
+- Per-file decisions based on codec, bitrate, resolution, duration, and size-per-minute
+- Intelligent resolution scaling:
+  - `4K -> 1080p`
+  - `1080p / 960p-class -> 720p`
+  - `720p -> 480p` only in stronger edge cases
+- Optional language-based cleanup for audio and subtitles
 - Forced subtitle preservation when relevant
-- Smart output renaming without network lookups
-- Optional original-file deletion only after a successful, smaller output
+- More aggressive audio compression with channel-aware Opus/AAC targets
+- Smart local renaming without network lookups
+- Optional original deletion only after a smaller successful output exists
 - Simulation mode with `-S` / `--simulate`
-- GPU encoder detection with automatic fallback to CPU `libx265`
+- GPU encoder detection with automatic retry on CPU
 
 ## Requirements
 
@@ -36,9 +41,9 @@ Recommended FFmpeg features:
 
 ## Installation
 
-Clone the repository and run `main.py`. No Python package install step is required.
+Clone the repository and run `main.py`. No extra Python packages are required.
 
-Example dependencies:
+System package examples:
 
 ### Arch Linux
 
@@ -59,138 +64,168 @@ sudo apt install python3 ffmpeg
 sudo dnf install python3 ffmpeg
 ```
 
-## Quick Start
+## Usage
 
 ```bash
 python3 main.py
 ```
 
-Simulation-only:
+Simulation only:
 
 ```bash
 python3 main.py -S
 ```
 
-At startup the tool lets you choose:
+Startup flow:
 
-1. UI language
-2. Input folder
-3. Whether the original file should be deleted if the compressed output is better
-4. Whether output files should be smart-renamed
-5. Compression mode
+1. Choose UI language
+2. Choose input folder
+3. Choose whether to delete the source when the compressed file is smaller
+4. Choose whether to smart-rename outputs
+5. Choose mode
+
+If you choose `Automatic`, the tool then asks for:
+
+1. Compression profile
+2. Whether language-based audio/subtitle cleanup should be enabled
+3. Target language(s), only if cleanup is enabled
 
 ## Modes
 
-### 1. Automatic
+### Automatic
 
-Best for bulk library compression.
+Best for batch compression with minimal manual work.
 
-Behavior:
+Profiles:
 
-- chooses audio/subtitle tracks automatically from the selected target language
-- removes other-language audio when target-language audio exists
-- removes normal subtitles when matching audio exists
-- keeps forced subtitles when appropriate
-- chooses CRF automatically
-- may reduce resolution automatically when the source is clearly oversized for its effective quality
+- `Medium`
+  - prioritizes visible quality
+  - only downscales when the source is above roughly `2K`, then targets `1080p`
+  - uses more conservative CRF decisions
+- `High`
+  - balance between quality retention and strong savings
+  - can downscale `1080p / 960p-class` sources to `720p`
+  - avoids the most aggressive behavior of `Extreme`
+- `Extreme`
+  - maximum automatic savings
+  - uses the strongest automatic CRF and scaling rules
+  - may push some oversized `720p` sources to `480p`
+- `Custom target size per file`
+  - asks for a target size per file during processing
+  - estimates a target video bitrate from duration and kept tracks
+  - can still scale resolution automatically to make the target more realistic
 
-### 2. Target Size
+Automatic mode can optionally clean tracks by language:
 
-Best when you want a predictable size budget per file.
+- if enabled, it keeps only the chosen language when matching audio exists
+- other-language audio is removed
+- normal subtitles are removed when matching audio already exists
+- forced subtitles are preserved when relevant
+- if multiple tracks exist in the chosen language, the tool asks which one to keep
 
-Behavior:
+If cleanup is disabled:
 
-- asks for a target size in MB
-- estimates output bitrate from duration and selected tracks
-- can also downscale automatically to help hit the target more realistically
-- still rejects results that are not smaller than the source
+- no language menus are shown
+- all audio and subtitle tracks are kept
 
-This mode is approximate, not mathematically exact. It is bitrate-targeted, not strict final-size locking.
+### Manual
 
-### 3. Manual
+Best for explicit control per file.
 
-Best when you want explicit control.
-
-Behavior:
-
-- manual audio/subtitle selection
+- manual audio selection
+- manual subtitle selection
 - manual CRF
-- manual output resolution selection
+- manual output resolution
 
-## Resolution Strategy
+## Video Strategy
 
-Resolution is part of the compression strategy, not just a cosmetic option.
+VideoCoder does not apply one fixed rule to every source. Automatic mode evaluates each file using:
 
-- `Automatic` and `Target Size` can decide resolution on their own
-- `Manual` lets you select the output resolution explicitly
-- `480p` is intentionally conservative in automatic modes and is only used in stronger edge cases
+- source codec
+- video or container bitrate
+- resolution class
+- duration
+- size-per-minute
+
+That data drives both:
+
+- CRF selection
+- resolution scaling
+
+The goal is storage reduction that still tracks source quality reasonably well, rather than blindly forcing every file through the same settings.
+
+## Audio Strategy
+
+Audio is no longer treated with a single fixed bitrate.
+
+- Efficient low-bitrate `AAC` and `Opus` tracks may be copied
+- `AC3` and `EAC3` are typically re-encoded to save space
+- Re-encoded audio uses channel-aware targets:
+  - mono: `64k`
+  - stereo: `96k`
+  - `5.1`: `144k`
+  - `7.1+`: `192k`
+
+This tends to cut total output size noticeably on multi-audio releases without over-penalizing normal playback.
 
 ## Smart Rename
 
-The smart rename option works locally and does not query online databases.
+Smart rename works locally and does not use online metadata providers.
 
-It is intended to:
+It is meant to:
 
 - remove common release noise
-- strip download-site clutter
+- strip site names and download clutter
 - normalize separators
 - preserve episode codes such as `S01E05` or `E05`
-- keep movie years when they are clearly present
+- preserve movie years when clearly present
 
-Examples:
+Example transformations:
 
 - `Movie.Title.2019.1080p.BluRay.x264-GROUP.mkv`
   becomes roughly `Movie Title (2019)`
 - `Show.Name.S01E05.720p.WEBRip.x265-GROUP.mkv`
   becomes roughly `Show Name S01E05`
 
-## Output Rules
+## Output Behavior
 
 VideoCoder never edits the source file in place.
 
 Default behavior:
 
-- source file is kept
-- output is written as a new file
-- standard naming uses `_compressed`
+- the source is preserved
+- output is written to a new file
+- the standard suffix is `_compressed`
 
-If smart rename is enabled, the output stem is cleaned before the `_compressed` suffix is applied.
+If smart rename is enabled, the cleaned title is used before `_compressed` is appended.
 
 If original deletion is enabled:
 
-- the original file is removed only after a successful encode
-- the output must also be smaller than the original
-- if smart rename is enabled, the final surviving file can be renamed to the cleaned title
+- the original is deleted only after a successful encode
+- the output must be smaller than the source
+- if smart rename is enabled, the surviving output can be renamed to the cleaned title
 
 If compression fails or the output is not smaller:
 
-- the original is kept
-- the bad output is discarded
+- the original stays untouched
+- the bad output is removed
 
 ## Encoders
 
-VideoCoder checks for HEVC encoders in this order:
+VideoCoder checks HEVC encoders in this order:
 
 - `hevc_nvenc`
 - `hevc_amf`
 - `hevc_videotoolbox`
 - `libx265`
 
-If a GPU encoder is detected but fails at runtime, the job is retried automatically with CPU `libx265`.
+If a GPU encoder is detected but fails at runtime, the same job is retried automatically with CPU `libx265`.
 
 ## Notes
 
-- Audio may be copied instead of re-encoded when it already looks efficient enough.
-- Subtitle behavior depends on container compatibility.
+- Subtitle handling depends on the output container.
 - `mp4` subtitle output may require conversion to `mov_text`.
-- Any lossy recompression can reduce quality. The tool is designed to balance that risk against storage savings, not eliminate it.
-
-## Roadmap
-
-- more robust content-type heuristics
-- better reporting / logging
-- optional sample-based comparison workflows
-- further UI translation cleanup
+- Any lossy recompression can reduce quality. The automatic profiles are there to expose that tradeoff explicitly instead of hiding it.
 
 ## License
 

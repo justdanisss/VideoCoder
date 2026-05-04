@@ -2,26 +2,31 @@
 
 [English](README.md) | Español
 
-VideoCoder es un compresor por lotes para terminal orientado a bibliotecas de películas y series. La idea es sencilla: reducir almacenamiento de forma agresiva, limpiar pistas innecesarias, renombrar mejor los archivos y tomar decisiones automáticas razonables sin depender de servicios externos.
+VideoCoder es un compresor de vídeo para terminal orientado a bibliotecas de películas y series. Está pensado para trabajar por lotes: recorrido recursivo de carpetas, recompresión HEVC agresiva, limpieza opcional de pistas por idioma, renombrado inteligente local y fallback automático de GPU a CPU `libx265`.
 
-## Resumen
+## Características
 
-- Procesamiento recursivo para `mp4`, `mkv`, `avi`, `mov`, `webm`, `ts`, `wmv`, `m4v`
-- Tres modos de trabajo:
+- Escaneo recursivo para `mp4`, `mkv`, `avi`, `mov`, `webm`, `ts`, `wmv`, `m4v`
+- Dos modos principales:
   - `Automático`
-  - `Tamaño objetivo`
   - `Manual`
-- Decisiones automáticas por archivo según codec, bitrate, resolución, duración y tamaño por minuto
+- Perfiles de compresión automática:
+  - `Intermedia`
+  - `Alta`
+  - `Extrema`
+  - `Tamaño objetivo personalizado por archivo`
+- Decisiones por archivo según codec, bitrate, resolución, duración y tamaño por minuto
 - Escalado inteligente de resolución:
-  - `2160p -> 1080p`
-  - `1080p -> 720p`
-  - `720p -> 480p` solo en casos más restrictivos
-- Selección de audio y subtítulos por idioma
-- Conservación de subtítulos forzados cuando conviene
+  - `4K -> 1080p`
+  - `1080p / clase 960p -> 720p`
+  - `720p -> 480p` solo en casos más extremos
+- Limpieza opcional de audio y subtítulos por idioma
+- Conservación de subtítulos forzados cuando corresponde
+- Compresión de audio más agresiva con objetivos según número de canales
 - Renombrado inteligente local, sin consultas online
-- Eliminación opcional del original solo si la salida es correcta y más pequeña
+- Eliminación opcional del original solo cuando ya existe una salida válida y más pequeña
 - Modo simulación con `-S` / `--simulate`
-- Detección de encoder GPU con fallback automático a CPU `libx265`
+- Detección de encoder GPU con reintento automático en CPU
 
 ## Requisitos
 
@@ -36,9 +41,9 @@ Recomendado en FFmpeg:
 
 ## Instalación
 
-Clona el repositorio y ejecuta `main.py`. No hay dependencias Python adicionales que instalar.
+Clona el repositorio y ejecuta `main.py`. No hay paquetes Python extra que instalar.
 
-Ejemplos de dependencias del sistema:
+Ejemplos de paquetes del sistema:
 
 ### Arch Linux
 
@@ -59,7 +64,7 @@ sudo apt install python3 ffmpeg
 sudo dnf install python3 ffmpeg
 ```
 
-## Inicio Rápido
+## Uso
 
 ```bash
 python3 main.py
@@ -71,71 +76,109 @@ Solo simulación:
 python3 main.py -S
 ```
 
-Al arrancar, la herramienta te deja elegir:
+Flujo de arranque:
 
-1. Idioma de la interfaz
-2. Carpeta de entrada
-3. Si quieres borrar el original cuando la salida sea mejor
-4. Si quieres usar renombrado inteligente en la salida
-5. Modo de compresión
+1. Elegir idioma de interfaz
+2. Elegir carpeta de entrada
+3. Elegir si borrar el original cuando el comprimido sea menor
+4. Elegir si activar renombrado inteligente
+5. Elegir modo
+
+Si eliges `Automático`, después se pide:
+
+1. Perfil de compresión
+2. Si quieres activar limpieza de audio/subtítulos por idioma
+3. Idioma(s) objetivo, solo si la limpieza está activada
 
 ## Modos
 
-### 1. Automático
+### Automático
 
-Pensado para comprimir una biblioteca grande con la menor intervención posible.
+Pensado para compresión por lotes con la mínima intervención posible.
 
-Comportamiento:
+Perfiles:
 
-- selecciona audio y subtítulos automáticamente según el idioma objetivo
-- elimina audios de otros idiomas cuando ya existe audio en el idioma elegido
-- elimina subtítulos normales cuando el audio del idioma objetivo ya existe
-- conserva subtítulos forzados cuando corresponde
-- decide el `CRF` automáticamente
-- puede bajar resolución si detecta que el archivo está claramente sobredimensionado
+- `Intermedia`
+  - prioriza la calidad visible
+  - solo baja resolución cuando la fuente supera aproximadamente `2K`, y entonces apunta a `1080p`
+  - usa decisiones de `CRF` más conservadoras
+- `Alta`
+  - equilibrio entre conservar calidad y ahorrar bastante espacio
+  - puede bajar fuentes tipo `1080p / 960p` a `720p`
+  - evita el comportamiento más agresivo de `Extrema`
+- `Extrema`
+  - máximo ahorro automático
+  - aplica las reglas más fuertes de `CRF` y escalado
+  - puede llevar algunas fuentes `720p` muy infladas a `480p`
+- `Tamaño objetivo personalizado por archivo`
+  - pide un tamaño objetivo por archivo durante el proceso
+  - estima el bitrate de vídeo a partir de la duración y de las pistas conservadas
+  - también puede ajustar resolución automáticamente para acercarse al objetivo
 
-### 2. Tamaño objetivo
+El modo automático puede limpiar pistas por idioma de forma opcional:
 
-Pensado para trabajar con una meta aproximada de MB por archivo.
+- si se activa, conserva solo el idioma elegido cuando existe audio coincidente
+- elimina audios de otros idiomas
+- elimina subtítulos normales cuando ya existe audio en ese idioma
+- conserva subtítulos forzados cuando conviene
+- si hay varias pistas en el idioma elegido, deja escoger cuál conservar
 
-Comportamiento:
+Si la limpieza está desactivada:
 
-- pide un tamaño objetivo en MB
-- estima el bitrate de salida a partir de la duración y de las pistas conservadas
-- también puede bajar resolución automáticamente si hace falta para acercarse al objetivo
-- sigue descartando resultados que no mejoren el tamaño del archivo original
+- no aparecen menús de idioma
+- se conservan todas las pistas de audio y subtítulos
 
-No es un bloqueo exacto de tamaño final; es una aproximación basada en bitrate objetivo.
+### Manual
 
-### 3. Manual
+Pensado para control explícito por archivo.
 
-Pensado para control total sobre cada archivo.
-
-Comportamiento:
-
-- selección manual de audio y subtítulos
+- selección manual de audio
+- selección manual de subtítulos
 - `CRF` manual
 - resolución de salida manual
 
-## Estrategia de Resolución
+## Estrategia de Vídeo
 
-La resolución forma parte de la compresión, no es un detalle secundario.
+VideoCoder no aplica una única regla fija a todas las fuentes. El modo automático evalúa cada archivo usando:
 
-- `Automático` y `Tamaño objetivo` pueden decidir la resolución por sí solos
-- `Manual` te deja elegirla explícitamente
-- `480p` está limitado de forma bastante conservadora en los modos automáticos
+- codec de origen
+- bitrate de vídeo o del contenedor
+- clase de resolución
+- duración
+- tamaño por minuto
+
+Con esos datos decide dos cosas:
+
+- el `CRF`
+- el posible escalado de resolución
+
+La idea es reducir almacenamiento de forma agresiva, pero relacionando la compresión con la calidad real aparente de la fuente, no machacando todo con exactamente el mismo ajuste.
+
+## Estrategia de Audio
+
+El audio ya no se trata con un único bitrate fijo.
+
+- Pistas `AAC` y `Opus` ya eficientes pueden copiarse
+- `AC3` y `EAC3` normalmente se recodifican para ahorrar espacio
+- El audio recodificado usa objetivos según canales:
+  - mono: `64k`
+  - estéreo: `96k`
+  - `5.1`: `144k`
+  - `7.1+`: `192k`
+
+Esto suele recortar bastante el tamaño total en releases con varios audios, sin castigar demasiado el uso normal.
 
 ## Renombrado Inteligente
 
-La opción de renombrado inteligente trabaja en local y no consulta bases de datos online.
+El renombrado inteligente funciona en local y no consulta proveedores online.
 
-Su objetivo es:
+Está pensado para:
 
-- eliminar basura típica de releases
-- quitar nombres de webs o fuentes de descarga
+- eliminar ruido típico de releases
+- quitar webs y basura de descarga
 - normalizar separadores
-- conservar patrones de episodio como `S01E05` o `E05`
-- mantener el año en películas cuando está claramente presente
+- conservar códigos de episodio como `S01E05` o `E05`
+- mantener el año en películas cuando aparece claramente
 
 Ejemplos:
 
@@ -144,53 +187,45 @@ Ejemplos:
 - `Show.Name.S01E05.720p.WEBRip.x265-GROUP.mkv`
   queda aproximadamente como `Show Name S01E05`
 
-## Reglas de Salida
+## Comportamiento de Salida
 
-VideoCoder nunca modifica el archivo fuente en el mismo nombre.
+VideoCoder nunca modifica el archivo original en el mismo nombre.
 
 Comportamiento por defecto:
 
 - el original se conserva
 - la salida se escribe como archivo nuevo
-- el patrón estándar usa sufijo `_compressed`
+- el sufijo estándar es `_compressed`
 
-Si el renombrado inteligente está activo, primero limpia el nombre base y luego aplica `_compressed`.
+Si el renombrado inteligente está activo, primero se limpia el título y luego se añade `_compressed`.
 
 Si activas el borrado del original:
 
 - el original solo se elimina después de una compresión correcta
-- la salida debe ser además más pequeña que el original
-- si el renombrado inteligente está activo, el archivo final superviviente puede quedarse con el nombre limpio
+- la salida tiene que ser más pequeña que el original
+- si el renombrado inteligente está activo, el archivo final puede quedarse con el nombre limpio
 
 Si la compresión falla o la salida no mejora tamaño:
 
-- el original se conserva
-- la salida mala se descarta
+- el original permanece intacto
+- la salida mala se elimina
 
 ## Encoders
 
-VideoCoder busca encoders HEVC en este orden:
+VideoCoder comprueba encoders HEVC en este orden:
 
 - `hevc_nvenc`
 - `hevc_amf`
 - `hevc_videotoolbox`
 - `libx265`
 
-Si detecta un encoder GPU pero falla al ejecutarse, reintenta automáticamente con `libx265` en CPU.
+Si detecta un encoder GPU pero falla al ejecutarse, reintenta automáticamente el mismo trabajo con `libx265` en CPU.
 
 ## Notas
 
-- El audio puede copiarse en lugar de recodificarse si ya parece suficientemente eficiente.
-- El tratamiento de subtítulos depende del contenedor y de la compatibilidad de salida.
+- El tratamiento de subtítulos depende del contenedor de salida.
 - En `mp4`, algunos subtítulos pueden requerir conversión a `mov_text`.
-- Toda recompresión con pérdida puede reducir calidad. El objetivo aquí es equilibrar ese coste visual con un ahorro real de espacio.
-
-## Roadmap
-
-- heurísticas más finas por tipo de contenido
-- mejores logs e informes
-- flujos opcionales de comparación por muestras
-- más pulido en la interfaz bilingüe
+- Toda recompresión con pérdida puede reducir calidad. Los perfiles automáticos existen precisamente para exponer ese equilibrio de forma clara.
 
 ## Licencia
 

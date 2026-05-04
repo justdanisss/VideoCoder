@@ -32,9 +32,17 @@ LANG_MAP = {
     'ar': ['ara', 'ar',  'arabic', 'árabe', 'arabe'],
 }
 LANG_NAMES = {
-    'es': 'Español', 'en': 'Inglés', 'fr': 'Francés', 'de': 'Alemán',
-    'it': 'Italiano', 'pt': 'Portugués', 'ja': 'Japonés', 'zh': 'Chino',
-    'ko': 'Coreano', 'ru': 'Ruso', 'ar': 'Árabe',
+    'es': {'es': 'Español', 'en': 'Spanish'},
+    'en': {'es': 'Inglés', 'en': 'English'},
+    'fr': {'es': 'Francés', 'en': 'French'},
+    'de': {'es': 'Alemán', 'en': 'German'},
+    'it': {'es': 'Italiano', 'en': 'Italian'},
+    'pt': {'es': 'Portugués', 'en': 'Portuguese'},
+    'ja': {'es': 'Japonés', 'en': 'Japanese'},
+    'zh': {'es': 'Chino', 'en': 'Chinese'},
+    'ko': {'es': 'Coreano', 'en': 'Korean'},
+    'ru': {'es': 'Ruso', 'en': 'Russian'},
+    'ar': {'es': 'Árabe', 'en': 'Arabic'},
 }
 
 _current_output = None
@@ -66,6 +74,10 @@ STRINGS = {
         'es': "Renombrar archivos con limpieza inteligente? [s/N]: ",
         'en': "Smart rename output files? [y/N]: ",
     },
+    'track_cleanup_q': {
+        'es': "Limpiar audios y subtitulos por idioma? [s/N]: ",
+        'en': "Clean audio and subtitle tracks by language? [y/N]: ",
+    },
     'simulation_active': {
         'es': "Modo simulacion activo: se analizara todo pero no se comprimira nada.",
         'en': "Simulation mode active: everything will be analyzed but nothing will be compressed.",
@@ -78,8 +90,13 @@ STRINGS = {
     'selection_mode': {'es': "Modo de seleccion:", 'en': "Selection mode:"},
     'mode_manual': {'es': "Manual      - eliges audio y subs en cada archivo", 'en': "Manual      - choose audio and subtitles for each file"},
     'mode_auto': {'es': "Automatico  - eliges idiomas y el script decide solo", 'en': "Automatic   - choose languages and the script decides"},
-    'mode_target': {'es': "Tamano objetivo - MB por archivo", 'en': "Target Size - goal MB per file"},
-    'choose_mode': {'es': "  -> Modo [1/2/3]: ", 'en': "  -> Mode [1/2/3]: "},
+    'choose_mode': {'es': "  -> Modo [1/2]: ", 'en': "  -> Mode [1/2]: "},
+    'auto_profile_title': {'es': "Perfil de compresion automatica:", 'en': "Automatic compression profile:"},
+    'profile_medium': {'es': "Intermedia  - reducir mucho sin perder apenas calidad", 'en': "Medium      - reduce a lot with minimal quality loss"},
+    'profile_high': {'es': "Alta        - punto medio entre calidad y ahorro agresivo", 'en': "High        - balance between quality and aggressive savings"},
+    'profile_extreme': {'es': "Extrema     - maxima compresion automatica", 'en': "Extreme     - maximum automatic compression"},
+    'profile_target': {'es': "Tamano objetivo personalizado por archivo", 'en': "Custom target size per file"},
+    'choose_profile': {'es': "  -> Perfil [1/2/3/4]: ", 'en': "  -> Profile [1/2/3/4]: "},
     'available_languages': {'es': "Idiomas disponibles:", 'en': "Available languages:"},
     'choose_keep_langs': {'es': "  -> Idiomas a conservar: ", 'en': "  -> Languages to keep: "},
     'keeping_langs': {'es': "Conservando: {names}", 'en': "Keeping: {names}"},
@@ -166,12 +183,23 @@ STRINGS = {
     'skip_bitrate_too_low': {'es': "su bitrate ({bitrate:.0f} kbps) ya es demasiado bajo para recomprimir con seguridad", 'en': "its bitrate ({bitrate:.0f} kbps) is already too low to recompress safely"},
     'target_already_below': {'es': "el archivo ya pesa {size:.1f} MB, por debajo del objetivo", 'en': "the file already weighs {size:.1f} MB, below the target"},
     'target_plan_reason': {'es': "objetivo {target:.1f} MB, video ~{video} kbps, audio ~{audio} kbps", 'en': "target {target:.1f} MB, video ~{video} kbps, audio ~{audio} kbps"},
+    'profile_label': {'es': "Perfil", 'en': "Profile"},
+    'profile_medium_short': {'es': "Intermedia", 'en': "Medium"},
+    'profile_high_short': {'es': "Alta", 'en': "High"},
+    'profile_extreme_short': {'es': "Extrema", 'en': "Extreme"},
 }
 
 
 def t(key, **kwargs):
     template = STRINGS.get(key, {}).get(UI_LANG, key)
     return template.format(**kwargs)
+
+
+def lang_name(code):
+    entry = LANG_NAMES.get(code)
+    if isinstance(entry, dict):
+        return entry.get(UI_LANG, code)
+    return entry or code
 
 
 def choose_ui_language():
@@ -520,7 +548,7 @@ def choose_target_langs():
     print(f"\n  {BOLD}{t('available_languages')}{RST}")
     codes = list(LANG_MAP.keys())
     for i, code in enumerate(codes):
-        print(f"   {C}[{i}]{RST} {LANG_NAMES[code]}")
+        print(f"   {C}[{i}]{RST} {lang_name(code)}")
     print(f"\n  {t('choose_langs_help')}")
     while True:
         raw = input(t('choose_keep_langs')).strip()
@@ -528,7 +556,7 @@ def choose_target_langs():
             chosen = [int(x.strip()) for x in raw.split(',') if x.strip()]
             if chosen and all(0 <= c < len(codes) for c in chosen):
                 selected = [codes[c] for c in chosen]
-                names = ', '.join(LANG_NAMES[c] for c in selected)
+                names = ', '.join(lang_name(c) for c in selected)
                 print(f"  {G}{t('keeping_langs', names=names)}{RST}")
                 return selected
             print(f"  {R}{t('out_of_range')}{RST}")
@@ -542,11 +570,11 @@ def auto_select_tracks(audios, subs, target_langs, filename):
     matched_audio_tracks = [track for track in audios if matches(track['lang'])]
 
     if matched_audio_tracks:
-        target_names = ', '.join(LANG_NAMES.get(code, code) for code in target_langs)
+        target_names = ', '.join(lang_name(code) for code in target_langs)
         print(f"  {G}{t('auto_audio_detected', names=target_names)}{RST}")
         if len(matched_audio_tracks) == 1:
             selected_a = [matched_audio_tracks[0]['index']]
-            kept_name = LANG_NAMES.get(_normalize_lang(matched_audio_tracks[0]['lang']), matched_audio_tracks[0]['lang'])
+            kept_name = lang_name(_normalize_lang(matched_audio_tracks[0]['lang']))
             print(f"  {G}{t('audio_kept', name=kept_name)}{RST}")
         else:
             print(f"  {Y}{t('multiple_audio_found')}{RST}")
@@ -563,13 +591,13 @@ def auto_select_tracks(audios, subs, target_langs, filename):
 
     if matched_audio:
         a_names = ', '.join(
-            LANG_NAMES.get(_normalize_lang(track['lang']), track['lang'])
+            lang_name(_normalize_lang(track['lang']))
             for track in audios if matches(track['lang'])
         )
         print(f"  {G}{t('audio_kept', name=a_names)}{RST}")
         if matched_subs:
             s_names = ', '.join(
-                LANG_NAMES.get(_normalize_lang(track['lang']), track['lang'])
+                lang_name(_normalize_lang(track['lang']))
                 for track in subs if track['index'] in matched_subs
             )
             print(f"  {G}{t('subs_kept', names=s_names)}{RST}")
@@ -612,6 +640,30 @@ def ask_target_size_mb(default=120):
             print(f"  {R}{t('target_size_min')}{RST}")
         except ValueError:
             print(f"  {R}{t('target_size_number')}{RST}")
+
+
+def choose_auto_profile():
+    print(f"\n  {BOLD}{t('auto_profile_title')}{RST}")
+    print(f"   {C}[1]{RST} {t('profile_medium')}")
+    print(f"   {C}[2]{RST} {t('profile_high')}")
+    print(f"   {C}[3]{RST} {t('profile_extreme')}")
+    print(f"   {C}[4]{RST} {t('profile_target')}")
+    mapping = {'1': 'medium', '2': 'high', '3': 'extreme', '4': 'target'}
+    while True:
+        raw = input(t('choose_profile')).strip()
+        if raw in mapping:
+            return mapping[raw]
+        print(f"  {R}{t('invalid_1_2')}{RST}")
+
+
+def auto_profile_label(profile):
+    labels = {
+        'medium': t('profile_medium_short'),
+        'high': t('profile_high_short'),
+        'extreme': t('profile_extreme_short'),
+        'target': t('target_size_label'),
+    }
+    return labels.get(profile, profile)
 
 
 def ask_resolution_target(source_height):
@@ -713,7 +765,7 @@ def summarize_subtitle_plan(subtitle_tracks):
     return ', '.join(parts)
 
 
-def choose_auto_scale(video_stream, format_info, crf):
+def choose_auto_scale(video_stream, format_info, crf, profile='extreme'):
     height = _safe_int(video_stream.get('height'))
     width = _safe_int(video_stream.get('width'))
     bitrate = _safe_int(video_stream.get('bit_rate')) or _safe_int(format_info.get('bit_rate'))
@@ -722,11 +774,19 @@ def choose_auto_scale(video_stream, format_info, crf):
     size_mb = _safe_int(format_info.get('size')) / (1024 * 1024)
     size_per_min_mb = size_mb / max(duration / 60.0, 1.0)
     is_hd_plus = height >= 900 or width >= 1600
+    is_above_2k = width > 2048 or height > 1200
+
+    if profile == 'medium':
+        if is_above_2k:
+            return 1080, t('scale_auto_4k_1080')
+        return 0, t('scale_keep_original')
 
     if height >= 2160:
         return 1080, t('scale_auto_4k_1080')
-    if is_hd_plus and (bitrate_kbps >= 4500 or size_per_min_mb >= 18 or crf >= 26):
+    if is_hd_plus and (bitrate_kbps >= 4500 or size_per_min_mb >= 18 or crf >= (25 if profile == 'high' else 26)):
         return 720, t('scale_auto_1080_720')
+    if profile == 'high':
+        return 0, t('scale_keep_original')
     if 720 <= height < 900 and (bitrate_kbps >= 5000 or size_per_min_mb >= 28) and crf >= 28:
         return 480, t('scale_auto_720_480')
     return 0, t('scale_keep_original')
@@ -751,7 +811,7 @@ def summarize_scale(scale_height):
     return f"{scale_height}p"
 
 
-def choose_auto_crf(video_stream, format_info):
+def choose_auto_crf(video_stream, format_info, profile='extreme'):
     codec = (video_stream.get('codec_name') or '').lower()
     height = _safe_int(video_stream.get('height'))
     video_bitrate = _safe_int(video_stream.get('bit_rate'))
@@ -780,35 +840,45 @@ def choose_auto_crf(video_stream, format_info):
     if bitrate_kbps and bitrate_kbps <= max(350, very_low_kbps * 0.7):
         return None, t('skip_bitrate_too_low', bitrate=bitrate_kbps)
 
-    if is_hevc:
-        crf = 24
-    elif is_h264:
-        crf = 24
+    if profile == 'medium':
+        base_crf = 22
+        min_crf, max_crf = 21, 24
+    elif profile == 'high':
+        base_crf = 23
+        min_crf, max_crf = 22, 26
     else:
-        crf = 24
+        base_crf = 24
+        min_crf, max_crf = 24, 28
+
+    if is_hevc:
+        crf = base_crf
+    elif is_h264:
+        crf = base_crf
+    else:
+        crf = base_crf
 
     if height >= 2160:
         crf += 1
-    elif height <= 720:
+    elif height <= 720 and profile != 'medium':
         crf -= 1
 
     if bitrate_kbps >= high_kbps * 1.5:
-        crf += 3
+        crf += 1 if profile == 'medium' else (2 if profile == 'high' else 3)
     elif bitrate_kbps >= high_kbps * 1.2:
-        crf += 2
+        crf += 1 if profile == 'medium' else 2
     elif bitrate_kbps >= high_kbps:
         crf += 1
     elif bitrate_kbps and bitrate_kbps <= low_kbps:
         crf -= 1
 
-    if size_per_min_mb >= 30:
-        crf += 2
-    elif size_per_min_mb >= 18:
+    if size_per_min_mb >= 40:
+        crf += 1 if profile == 'medium' else (2 if profile == 'high' else 2)
+    elif size_per_min_mb >= 24:
         crf += 1
     elif size_per_min_mb <= 6:
         crf -= 1
 
-    crf = max(24, min(28, crf))
+    crf = max(min_crf, min(max_crf, crf))
     reason = (
         f"{codec or t('unknown_codec')}, {height or '?'}p, {bitrate_kbps:.0f} kbps, "
         f"{size_per_min_mb:.1f} MB/min"
@@ -992,20 +1062,20 @@ def main():
     # ── Elegir modo ──
     print(f"\n  {BOLD}{t('selection_mode')}{RST}")
     print(f"   {C}[1]{RST} {t('mode_auto')}")
-    print(f"   {C}[2]{RST} {t('mode_target')}")
-    print(f"   {C}[3]{RST} {t('mode_manual')}")
+    print(f"   {C}[2]{RST} {t('mode_manual')}")
     while True:
         modo = input(t('choose_mode')).strip()
-        if modo in ('1', '2', '3'):
+        if modo in ('1', '2'):
             break
         print(f"  {R}{t('invalid_1_2')}{RST}")
 
+    auto_profile = choose_auto_profile() if modo == '1' else None
+    cleanup_tracks = ask_yes_no('track_cleanup_q', default=False) if modo == '1' else False
     target_langs = None
-    if modo in ('1', '2'):
+    if modo == '1' and cleanup_tracks:
         target_langs = choose_target_langs()
 
-    crf = ask_crf() if modo == '3' else None
-    target_size_mb = ask_target_size_mb() if modo == '2' else None
+    crf = ask_crf() if modo == '2' else None
     total_saved = 0
 
     for full_path in videos:
@@ -1066,11 +1136,15 @@ def main():
             print(f"  {R}{t('no_video_track')}{RST}")
             continue
 
-        if modo in ('1', '2') and target_langs:
+        if modo == '1' and cleanup_tracks and target_langs:
             selected_a, selected_s = auto_select_tracks(audios, subs, target_langs, file)
         else:
-            selected_a = pick_tracks(t('audio_tracks_label'), audios)
-            selected_s = pick_tracks(t('subtitle_tracks_label'), subs, allow_none=True)
+            if modo == '1':
+                selected_a = [track['index'] for track in audios]
+                selected_s = [track['index'] for track in subs]
+            else:
+                selected_a = pick_tracks(t('audio_tracks_label'), audios)
+                selected_s = pick_tracks(t('subtitle_tracks_label'), subs, allow_none=True)
 
         if not selected_a:
             print(f"  {Y}{t('no_audio_default')}{RST}")
@@ -1078,16 +1152,23 @@ def main():
 
         source_height = _safe_int(video_stream.get('height'))
         encode_plan = {'kind': 'crf', 'crf': crf, 'scale_height': 0}
+        target_size_mb = None
         if modo == '1':
-            current_crf, reason = choose_auto_crf(video_stream, format_info)
-            if current_crf is None:
-                print(f"  {Y}{t('skip_recompression', reason=reason)}{RST}")
-                continue
-            auto_scale, scale_reason = choose_auto_scale(video_stream, format_info, current_crf)
-            encode_plan = {'kind': 'crf', 'crf': current_crf, 'scale_height': auto_scale}
-            print(f"  {C}{t('automatic_decision')}{RST} {summarize_video_plan(video_stream, format_info, current_crf)}")
-            print(f"  {DIM}{t('reason', reason=reason)}{RST}")
-            print(f"  {DIM}{t('resolution_label')}: {summarize_scale(auto_scale)} ({scale_reason}){RST}")
+            if auto_profile == 'target':
+                original_mb = _safe_int(format_info.get('size')) / (1024 * 1024)
+                target_default = max(120, int(round(original_mb * 0.45))) if original_mb else 120
+                target_size_mb = ask_target_size_mb(default=target_default)
+            else:
+                current_crf, reason = choose_auto_crf(video_stream, format_info, auto_profile)
+                if current_crf is None:
+                    print(f"  {Y}{t('skip_recompression', reason=reason)}{RST}")
+                    continue
+                auto_scale, scale_reason = choose_auto_scale(video_stream, format_info, current_crf, auto_profile)
+                encode_plan = {'kind': 'crf', 'crf': current_crf, 'scale_height': auto_scale}
+                print(f"  {C}{t('profile_label')}:{RST} {auto_profile_label(auto_profile)}")
+                print(f"  {C}{t('automatic_decision')}{RST} {summarize_video_plan(video_stream, format_info, current_crf)}")
+                print(f"  {DIM}{t('reason', reason=reason)}{RST}")
+                print(f"  {DIM}{t('resolution_label')}: {summarize_scale(auto_scale)} ({scale_reason}){RST}")
 
         selected_audio_tracks = []
         audio_by_index = {track['index']: track for track in audios}
@@ -1110,7 +1191,7 @@ def main():
         print(f"  {C}{t('audio')}:{RST} {summarize_audio_plan(selected_audio_tracks)}")
         print(f"  {C}{t('subs')}:{RST} {summarize_subtitle_plan(selected_subtitle_tracks)}")
 
-        if modo == '2':
+        if modo == '1' and auto_profile == 'target':
             encode_plan, reason = build_target_size_plan(
                 format_info, selected_audio_tracks, selected_subtitle_tracks, target_size_mb
             )
@@ -1121,10 +1202,11 @@ def main():
                 video_stream, target_size_mb, encode_plan['total_bitrate_k']
             )
             encode_plan['scale_height'] = target_scale
+            print(f"  {C}{t('profile_label')}:{RST} {auto_profile_label(auto_profile)}")
             print(f"  {C}{t('target_size_label')}:{RST} {target_size_mb:.1f} MB")
             print(f"  {DIM}{reason}.{RST}")
             print(f"  {DIM}{t('resolution_label')}: {summarize_scale(target_scale)} ({scale_reason}){RST}")
-        elif modo == '3':
+        elif modo == '2':
             manual_scale = ask_resolution_target(source_height)
             encode_plan['scale_height'] = manual_scale
 
