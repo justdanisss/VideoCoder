@@ -75,8 +75,8 @@ STRINGS = {
         'en': "Smart rename output files? [y/N]: ",
     },
     'track_cleanup_q': {
-        'es': "Limpiar audios y subtitulos por idioma? [s/N]: ",
-        'en': "Clean audio and subtitle tracks by language? [y/N]: ",
+        'es': "Limpiar audios y subtitulos por idioma? [S/n]: ",
+        'en': "Clean audio and subtitle tracks by language? [Y/n]: ",
     },
     'simulation_active': {
         'es': "Modo simulacion activo: se analizara todo pero no se comprimira nada.",
@@ -123,6 +123,7 @@ STRINGS = {
     'final_renamed': {'es': "Renombrado final: {path}", 'en': "Final rename: {path}"},
     'installing': {'es': "Instalando: {packages}", 'en': "Installing: {packages}"},
     'ffmpeg_fallback_cpu': {'es': "El encoder GPU fallo. Reintentando con CPU libx265...", 'en': "GPU encoder failed. Retrying with CPU libx265..."},
+    'ffmpeg_fallback_aac': {'es': "El audio con Opus fallo. Reintentando con AAC...", 'en': "Opus audio failed. Retrying with AAC..."},
     'ffmpeg_errors': {'es': "FFmpeg devolvio estos errores:", 'en': "FFmpeg returned these errors:"},
     'track_all': {'es': "todas", 'en': "all"},
     'track_none': {'es': "ninguna", 'en': "none"},
@@ -296,8 +297,8 @@ def _pick_audio_codec():
     return 'libopus' if _ffmpeg_has_codec('libopus') else 'aac'
 
 
-def _build_ffmpeg_cmd(input_path, output_path, v_map, audio_tracks, subtitle_tracks, encoder, encode_plan):
-    audio_codec = _pick_audio_codec()
+def _build_ffmpeg_cmd(input_path, output_path, v_map, audio_tracks, subtitle_tracks, encoder, encode_plan, preferred_audio_codec=None):
+    preferred_audio_codec = preferred_audio_codec or _pick_audio_codec()
     ext = Path(output_path).suffix.lower()
     # MP4 solo admite mov_text; MKV admite casi todo
     sub_codec = 'mov_text' if ext == '.mp4' else 'copy'
@@ -336,12 +337,12 @@ def _build_ffmpeg_cmd(input_path, output_path, v_map, audio_tracks, subtitle_tra
     else:
         cmd += ['-c:v', 'libx265', '-crf', str(encode_plan['crf']), '-preset', 'medium']
 
-    if audio_tracks and all(track.get('copy_ok') for track in audio_tracks):
-        cmd += ['-c:a', 'copy']
-    else:
-        cmd += ['-c:a', audio_codec]
-        for i, track in enumerate(audio_tracks):
-            cmd += [f'-b:a:{i}', choose_audio_bitrate(track)]
+    for i, track in enumerate(audio_tracks):
+        if track.get('copy_ok'):
+            cmd += [f'-c:a:{i}', 'copy']
+            continue
+        audio_codec = choose_audio_encoder(track, preferred_audio_codec)
+        cmd += [f'-c:a:{i}', audio_codec, f'-b:a:{i}', choose_audio_bitrate(track)]
 
     if subtitle_tracks:
         cmd += ['-c:s', sub_codec]
@@ -373,6 +374,18 @@ def _should_fallback_to_cpu(stderr_text, encoder):
     )
     lowered = stderr_text.lower()
     return any(err.lower() in lowered for err in gpu_errors)
+
+
+def _should_fallback_to_aac(stderr_text, preferred_audio_codec):
+    if preferred_audio_codec != 'libopus':
+        return False
+    lowered = stderr_text.lower()
+    audio_errors = (
+        'libopus',
+        'could not open encoder before eof',
+        'invalid argument',
+    )
+    return all(token in lowered for token in audio_errors)
 
 
 # ── Analisis ─────────────────────────────────
@@ -425,11 +438,12 @@ def compress_video(input_path, output_path, v_map, a_maps, s_maps, encoder, enco
     _current_output = output_path
 
     selected_encoder = encoder
+    preferred_audio_codec = _pick_audio_codec()
 
     try:
-        for attempt in range(2):
+        for attempt in range(3):
             cmd = _build_ffmpeg_cmd(
-                input_path, output_path, v_map, a_maps, s_maps, selected_encoder, encode_plan
+                input_path, output_path, v_map, a_maps, s_maps, selected_encoder, encode_plan, preferred_audio_codec
             )
             print(f"\n{DIM}CMD: {' '.join(cmd)}{RST}")
 
@@ -471,6 +485,10 @@ def compress_video(input_path, output_path, v_map, a_maps, s_maps, encoder, enco
             if attempt == 0 and _should_fallback_to_cpu(stderr_text, selected_encoder):
                 print(f"{Y}{t('ffmpeg_fallback_cpu')}{RST}")
                 selected_encoder = 'libx265'
+                continue
+            if _should_fallback_to_aac(stderr_text, preferred_audio_codec):
+                print(f"{Y}{t('ffmpeg_fallback_aac')}{RST}")
+                preferred_audio_codec = 'aac'
                 continue
 
             if stderr_lines:
@@ -718,6 +736,18 @@ def should_copy_audio(track):
     return bitrate > 0 and bitrate <= 128000
 
 
+def choose_audio_encoder(track, preferred_codec=None):
+    codec = preferred_codec or _pick_audio_codec()
+    channels = _safe_int(track.get('channels'))
+    layout = (track.get('channel_layout') or '').lower()
+    if codec == 'libopus':
+        if channels > 6:
+            return 'aac'
+        if any(tag in layout for tag in ('7.1', 'hexadecagonal', '22.2')):
+            return 'aac'
+    return codec
+
+
 def choose_audio_bitrate(track):
     channels = _safe_int(track.get('channels'))
     if channels >= 8:
@@ -748,7 +778,10 @@ def summarize_audio_plan(audio_tracks):
         mode = t('copy_mode') if track.get('copy_ok') else t('reencode_mode')
         channels = _safe_int(track.get('channels'))
         channel_label = f"{channels}ch" if channels > 0 else t('audio_unknown_channels')
-        target = '' if track.get('copy_ok') else f" -> {choose_audio_bitrate(track)}"
+        target = ''
+        if not track.get('copy_ok'):
+            target_codec = choose_audio_encoder(track)
+            target = f" -> {target_codec} {choose_audio_bitrate(track)}"
         parts.append(f"#{track['index']} {track['codec']} {track['lang']} {channel_label} [{mode}{target}]")
     return ', '.join(parts)
 
@@ -1070,7 +1103,7 @@ def main():
         print(f"  {R}{t('invalid_1_2')}{RST}")
 
     auto_profile = choose_auto_profile() if modo == '1' else None
-    cleanup_tracks = ask_yes_no('track_cleanup_q', default=False) if modo == '1' else False
+    cleanup_tracks = ask_yes_no('track_cleanup_q', default=True) if modo == '1' else False
     target_langs = None
     if modo == '1' and cleanup_tracks:
         target_langs = choose_target_langs()
