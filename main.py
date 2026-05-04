@@ -996,6 +996,8 @@ def build_clean_title(full_path):
 
 def build_output_path(full_path, output_stem):
     suffix = Path(full_path).suffix
+    if suffix.lower() == '.avi':
+        suffix = '.mkv'
     base = os.path.dirname(full_path)
     path = os.path.join(base, f"{output_stem}{suffix}")
     n = 2
